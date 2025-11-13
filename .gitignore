@@ -12,4 +12,5 @@ dist/
 Thumbs.db
 *.ico
 *.png
+*.spec
 versions/
