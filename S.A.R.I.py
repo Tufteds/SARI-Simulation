@@ -65,6 +65,22 @@ class Simulation():
             self.log_message(f"День {day + 1}: {stats}")
             self.population.update()
 
+class GUI():
+    def __init__(self, root):
+        self.root = root
+        # инициализация формы, полей ввода, кнопок, графиков
+
+    def start_simulation(self):
+        pop_size = int(self.population_entry.get())
+        days = int(self.days_entry.get())
+        sim = Simulation(pop_size, days, self.log_message)
+        sim.run()
+        self.draw_graph(sim.history)
+
+    def log_message(self, msg):
+        self.log_output.insert(tk.END, msg + '\n')
+        self.log_output.see(tk.END)
+
 # Параметры
 infection_probability = 0.1
 base_duration = random.randint(5, 6)
