@@ -1,190 +1,239 @@
-# Импорт модулей
-import os
-import sys
+# --- Стандартные библиотеки ---
+import os, sys
 import tkinter as tk
-from tkinter import messagebox, scrolledtext
 import random
+from tkinter import messagebox, scrolledtext
 from collections import defaultdict
+
+# --- Сторонние библиотеки ---
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
 
-# Параметры
-infection_probability = 0.1
-base_duration = random.randint(5, 6)
-power_immunity = ['low', 'medium', 'strong']
-immunity_effects = {'low': 1, 'medium': 0, 'strong': -1}
-time_incubation = 2
-
-# Глобальные
-graph_canvas = None
-log_output = None
+def singleton(cls):
+    instances = {}
+    def get_instance(*args, **kwargs):
+        if cls not in instances:
+            instances[cls] = cls(*args, **kwargs)
+        return instances[cls]
+    return get_instance
 
 def resource_path(relative_path):
-    """Возвращает путь к ресурсу, работает и в .exe, и при обычном запуске"""
+    """Возвращает абсолютный путь к ресурсу (иконка, файл и т.д.)"""
     try:
-        base_path = sys._MEIPASS  # если это PyInstaller
+        # если это PyInstaller
+        base_path = sys._MEIPASS
     except AttributeError:
-        base_path = os.path.abspath(".")  # при обычном запуске
+        base_path = os.path.abspath(".")
     return os.path.join(base_path, relative_path)
 
-# Группировка
-def group_by_status(population):
-    groups = defaultdict(list)
-    for person in population:
-        groups[person['status']].append(person)
-    return groups
+@singleton
+class Virus():
+    def __init__(self):
+        self.type = 'ОРВИ'
+        self.time_incubation = 2
+        self.base_duration = random.randint(5, 6)
+        self.infection_probability = 0.1
 
-# Инициализация
-def initialize_population(size, infected_count):
-    population = [{'status': 'healthy', 'days_infected': 0, 'incubation': 0,
-                   'immunity': random.choice(power_immunity)} for _ in range(size)]
-    for person in random.sample(population, infected_count):
-        person['status'] = 'exposed'
-    return population
+virus = Virus()
 
-# Обновление инфекции
-def update_infections(groups):
-    new_infections = 0
-    for person in groups['infected']:
-        person['days_infected'] += 1
-        if person['days_infected'] >= base_duration + immunity_effects[person['immunity']]:
-            person['status'] = 'cured'
+class Person():
+    def __init__(self, immunity):
+        self.status = 'healthy'
+        self.days_infected = 0
+        self.incubation = 0
+        self.immunity = immunity
+        self.immunity_effects = {'low': 1, 'medium': 0, 'strong': -1}
 
-    for person in groups['exposed']:
-        person['incubation'] += 1
-        if person['incubation'] >= time_incubation:
-            person['status'] = 'infected'
+    def update_infections(self):
+        if self.status == 'exposed':
+            self.incubation += 1
+            if self.incubation >= virus.time_incubation:
+                self.status = 'infected'
+        elif self.status == 'infected':
+            self.days_infected += 1
+            if self.days_infected >= virus.base_duration + self.immunity_effects[self.immunity]:
+                self.status = 'cured'
 
-    infected_group = groups['infected']
-    healthy_group = groups['healthy']
+    def get_contact(self):
+        pass
 
-    if infected_group and healthy_group:
-        random.shuffle(healthy_group)
-        contact_index = 0
-        for inf in infected_group:
-            for _ in range(2):
-                if contact_index >= len(healthy_group):
-                    break
-                target = healthy_group[contact_index]
-                contact_index += 1
-                adj_prob = infection_probability + \
-                    (0.03 if inf['immunity'] == 'low' else -0.03 if inf['immunity'] == 'strong' else 0)
-                if random.random() < adj_prob:
-                    target['status'] = 'exposed'
-                    target['incubation'] = 0
-                    new_infections += 1
-    return new_infections
+class Population():
+    def __init__(self, size, infected_count):
+        self.people = [Person(random.choice(['low', 'medium', 'strong'])) for _ in range(size)]
+        for person in random.sample(self.people, infected_count):
+            person.status = 'exposed'
 
-def log_message(message):
-    log_output.insert(tk.END, message + '\n')
-    log_output.see(tk.END)
+    def update(self):
+        groups = self.group_by_status()
+        new_infections = 0
 
-def simulate(population_size, days):
-    global graph_canvas
+        for person in self.people:
+            person.update_infections()
 
-    initial_infected = round(population_size * 0.05)
-    population = initialize_population(population_size, initial_infected)
-    history = {'healthy': [], 'exposed': [], 'infected': [], 'cured': []}
+        infected_group = groups['infected']
+        healthy_group = groups['healthy']
 
-    max_infected = 0
-    peak_day = 0
+        if infected_group and healthy_group:
+            random.shuffle(healthy_group)
+            for infected_person in infected_group:
+                for _ in range(2):
+                    if not healthy_group:
+                        break
+                    target = healthy_group.pop()
+                    if random.random() < virus.infection_probability:
+                        target.status = 'exposed'
+                        target.incubation = 0
+                        new_infections += 1
+        return new_infections
+    def group_by_status(self):
+        groups = defaultdict(list)
+        for person in self.people:
+            groups[person.status].append(person)
+        return groups
 
-    for day in range(days):
-        groups = group_by_status(population)
-        healthy = len(groups['healthy'])
-        exposed = len(groups['exposed'])
-        infected = len(groups['infected'])
-        cured = len(groups['cured'])
+    def get_statistics(self):
+        return {status: len(group) for status, group in self.group_by_status().items()}
 
-        history['healthy'].append(healthy)
-        history['exposed'].append(exposed)
-        history['infected'].append(infected)
-        history['cured'].append(cured)
+class Simulation():
+    def __init__(self, population_size, days, log_callback):
+        self.population = Population(population_size, round(population_size*0.05))
+        self.days = days
+        self.history = {'healthy': [], 'exposed': [], 'infected': [], 'cured': []}
+        self.log_callback = log_callback
+        self.peak_day = 0
+        self.max_infected = 0
 
-        # Определяем пик болезни
-        if infected > max_infected:
-            max_infected = infected
-            peak_day = day
+    def log_message(self, message):
+        self.log_callback(message)
 
-        log_message(f"--- День {day+1} ---")
-        log_message(f"Здоровые: {healthy}, Подверженные: {exposed}, Заражённые: {infected}, Вылеченные: {cured}")
+    def run(self):
+        for day in range(self.days):
+            groups = self.population.group_by_status()
+            healthy = len(groups.get('healthy', []))
+            exposed = len(groups.get('exposed', []))
+            infected = len(groups.get('infected', []))
+            cured = len(groups.get('cured', []))
 
-        if (infected == 0 and exposed == 0) or healthy == 0:
-            log_message("Симуляция завершена.")
-            break
+            # сохраняем в history всегда в одном порядке и с 0 по-умолчанию
+            self.history['healthy'].append(healthy)
+            self.history['exposed'].append(exposed)
+            self.history['infected'].append(infected)
+            self.history['cured'].append(cured)
 
-        new_infected = update_infections(groups)
-        log_message(f"Новые заражённые: {new_infected}")
+            if infected > self.max_infected:
+                self.max_infected = infected
+                self.peak_day = day
 
-    if graph_canvas:
-        graph_canvas.get_tk_widget().destroy()
+            # Логи в требуемом формате
+            self.log_message(f"--- День {day + 1} ---")
+            self.log_message(
+                f"Здоровые: {healthy}, Подверженные: {exposed}, Заражённые: {infected}, Вылеченные: {cured}")
 
-    fig = Figure(figsize=(6, 4), dpi=100, facecolor='white')
-    plot = fig.add_subplot(111)
-    plot.set_facecolor('white')
+            # если эпидемия кончилась — останавливаем
+            if (infected == 0 and exposed == 0) or healthy == 0:
+                self.log_message("Симуляция завершена.")
+                break
 
-    plot.plot(history['healthy'], label='Здоровые', color='green', linewidth=2)
-    plot.plot(history['exposed'], label='Подверженные', color='orange', linewidth=2)
-    plot.plot(history['infected'], label='Заражённые', color='red', linewidth=2)
-    plot.plot(history['cured'], label='Вылеченные', color='blue', linewidth=2)
+            # обновляем популяцию — получаем число новых заражённых
+            new_infected = self.population.update()
+            self.log_message(f"Новые заражённые: {new_infected}")
 
-    # Добавление точки на графике для пика болезни
-    plot.plot(peak_day, max_infected, 'ro')  # 'ro' — красная точка
-    plot.text(peak_day, max_infected, f'Пик болезни\nДень {peak_day + 1}', 
-              fontsize=10, color='black', ha='center', va='bottom')
+        return self.history
 
-    plot.set_xlabel('Дни', color='black')
-    plot.set_ylabel('Люди', color='black')
-    plot.set_title('ОРВИ Симуляция', color='black')
-    plot.tick_params(colors='black')
-    plot.grid(True, linestyle='--', alpha=0.5)
-    plot.legend()
-
-    graph_canvas = FigureCanvasTkAgg(fig, master=right_frame)
-    graph_canvas.draw()
-    graph_canvas.get_tk_widget().pack(fill='both', expand=True)
+class GUI():
+    def __init__(self, root):
+        self.root = root
+        self.font = ('Segoe UI', 13)
+        self.graph_canvas = None
+        self.build_ui()
 
 
-def start_simulation():
-    log_output.delete(1.0, tk.END)
-    try:
-        population_size = int(population_entry.get().replace('.', ''))
-        days = int(days_entry.get().replace('.', ''))
-        if population_size <= 0 or days <= 0:
-            raise ValueError
-        simulate(population_size, days)
-    except ValueError:
-        messagebox.showerror("Ошибка", "Пожалуйста, введите корректные значения.")
+    def build_ui(self):
+        self.main_frame = tk.Frame(self.root)
+        self.main_frame.pack(fill='both', expand=True)
 
+<<<<<<< HEAD
 # Интерфейс
 root = tk.Tk()
 root.title("Симуляция распространения ОРВИ")
 root.geometry("1500x600")
 # root.iconbitmap(resource_path("virus.ico"))
 font = ('Segoe UI', 13)
+=======
+        self.left_frame = tk.Frame(self.main_frame)
+        self.left_frame.pack(side='left', fill='both', expand=True, padx=10, pady=10)
+>>>>>>> develop
 
-# Макет
-main_frame = tk.Frame(root)
-main_frame.pack(fill='both', expand=True)
+        self.right_frame = tk.Frame(self.main_frame)
+        self.right_frame.pack(side='right', fill='both', expand=True, padx=10, pady=10)
 
-left_frame = tk.Frame(main_frame)
-left_frame.pack(side='left', fill='both', expand=True, padx=10, pady=10)
+        tk.Label(self.left_frame, text="Размер популяции:", font=self.font).pack(pady=5)
+        self.population_entry = tk.Entry(self.left_frame, font=self.font)
+        self.population_entry.pack(pady=5)
 
-right_frame = tk.Frame(main_frame)
-right_frame.pack(side='right', fill='both', expand=True, padx=10, pady=10)
+        tk.Label(self.left_frame, text="Количество дней симуляции:", font=self.font).pack(pady=5)
+        self.days_entry = tk.Entry(self.left_frame, font=self.font)
+        self.days_entry.pack(pady=5)
 
-# Элементы слева
-tk.Label(left_frame, text="Размер популяции:", font=font).pack(pady=5)
-population_entry = tk.Entry(left_frame, font=font)
-population_entry.pack(pady=5)
+        tk.Button(self.left_frame, text="🚀 Запустить симуляцию", font=self.font, command=self.start_simulation).pack(
+            pady=10)
 
-tk.Label(left_frame, text="Количество дней симуляции:", font=font).pack(pady=5)
-days_entry = tk.Entry(left_frame, font=font)
-days_entry.pack(pady=5)
+        self.log_output = scrolledtext.ScrolledText(self.left_frame, height=20, font=('Consolas', 11))
+        self.log_output.pack(pady=10, fill='both', expand=True)
 
-tk.Button(left_frame, text="🚀 Запустить симуляцию", font=font, command=start_simulation).pack(pady=10)
+    def start_simulation(self):
+        try:
+            population_size = int(self.population_entry.get().replace('.', ''))
+            days = int(self.days_entry.get().replace('.', ''))
+            if population_size <= 0 or days <= 0:
+                raise ValueError
+        except ValueError:
+            messagebox.showerror("Ошибка", "Пожалуйста, введите корректные значения.")
+            return
 
-log_output = scrolledtext.ScrolledText(left_frame, height=20, font=('Consolas', 11))
-log_output.pack(pady=10, fill='both', expand=True)
+        # очищаем лог перед новой симуляцией
+        self.log_output.delete(1.0, tk.END)
 
-root.mainloop()
+        # запускаем симуляцию и отрисовываем график
+        self.sim = Simulation(population_size, days, self.log_message)
+        self.sim.run()
+        self.draw_graph(self.sim.history)
+    def log_message(self, msg):
+        self.log_output.insert(tk.END, msg + '\n')
+        self.log_output.see(tk.END)
+
+    def draw_graph(self, history):
+        if self.graph_canvas:
+            self.graph_canvas.get_tk_widget().destroy()
+
+        fig = Figure(figsize=(6, 4), dpi=100)
+        plot = fig.add_subplot(111)
+        plot.plot(history['healthy'], label='Здоровые', color='green')
+        plot.plot(history['exposed'], label='Подверженные', color='orange')
+        plot.plot(history['infected'], label='Заражённые', color='red')
+        plot.plot(history['cured'], label='Вылеченные', color='blue')
+        plot.legend()
+        plot.grid(True, linestyle='--', alpha=0.5)
+
+        plot.plot(self.sim.peak_day, self.sim.max_infected, 'ro')  # 'ro' — красная точка
+        plot.text(self.sim.peak_day, self.sim.max_infected, f'Пик болезни\nДень {self.sim.peak_day + 1}',
+                  fontsize=10, color='black', ha='center', va='bottom')
+
+        plot.set_xlabel('Дни', color='black')
+        plot.set_ylabel('Люди', color='black')
+        plot.set_title('ОРВИ Симуляция', color='black')
+        plot.tick_params(colors='black')
+        plot.grid(True, linestyle='--', alpha=0.5)
+        plot.legend()
+
+        self.graph_canvas = FigureCanvasTkAgg(fig, master=self.right_frame)
+        self.graph_canvas.draw()
+        self.graph_canvas.get_tk_widget().pack(fill='both', expand=True)
+
+if __name__ == "__main__":
+    root = tk.Tk()
+    root.title("Симуляция распространения ОРВИ")
+    root.geometry("1500x600")
+    root.iconbitmap(resource_path("icons/virus.ico"))
+    gui = GUI(root)
+    root.mainloop()
