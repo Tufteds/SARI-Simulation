@@ -1,10 +1,11 @@
-# Импорт модулей
-import os
-import sys
+# --- Стандартные библиотеки ---
+import os, sys
 import tkinter as tk
-from tkinter import messagebox, scrolledtext
 import random
+from tkinter import messagebox, scrolledtext
 from collections import defaultdict
+
+# --- Сторонние библиотеки ---
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
 
