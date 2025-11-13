@@ -64,11 +64,30 @@ class Simulation():
                 self.history[status].append(count)
             self.log_message(f"День {day + 1}: {stats}")
             self.population.update()
+        return self.history
 
 class GUI():
     def __init__(self, root):
         self.root = root
-        # инициализация формы, полей ввода, кнопок, графиков
+
+    def build_ui(self):
+        self.left_frame = tk.Frame(self.root)
+        self.left_frame.pack(side='left', fill='both', expand=True, padx=10, pady=10)
+
+        self.right_frame = tk.Frame(self.root)
+        self.right_frame.pack(side='right', fill='both', expand=True, padx=10, pady=10)
+
+        self.log_output = scrolledtext.ScrolledText(self.left_frame, height=20)
+        self.log_output.pack(fill='both', expand=True, pady=10)
+
+        self.population_entry = tk.Entry(self.left_frame)
+        self.population_entry.pack(pady=5)
+        self.days_entry = tk.Entry(self.left_frame)
+        self.days_entry.pack(pady=5)
+
+        tk.Button(
+            self.left_frame, text="🚀 Запустить", command=self.start_simulation
+        ).pack(pady=10)
 
     def start_simulation(self):
         pop_size = int(self.population_entry.get())
@@ -80,6 +99,25 @@ class GUI():
     def log_message(self, msg):
         self.log_output.insert(tk.END, msg + '\n')
         self.log_output.see(tk.END)
+
+    def draw_graph(self, history):
+        fig = Figure(figsize=(6, 4), dpi=100)
+        plot = fig.add_subplot(111)
+        plot.plot(history['healthy'], label='Здоровые', color='green')
+        plot.plot(history['exposed'], label='Подверженные', color='orange')
+        plot.plot(history['infected'], label='Заражённые', color='red')
+        plot.plot(history['cured'], label='Вылеченные', color='blue')
+        plot.legend()
+        plot.grid(True, linestyle='--', alpha=0.5)
+
+        canvas = FigureCanvasTkAgg(fig, master=self.right_frame)
+        canvas.draw()
+        canvas.get_tk_widget().pack(fill='both', expand=True)
+
+if __name__ == "__main__":
+    root = tk.Tk()
+    gui = GUI(root)
+    root.mainloop()
 
 # Параметры
 infection_probability = 0.1
