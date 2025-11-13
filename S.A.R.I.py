@@ -29,6 +29,24 @@ class Person():
     def get_contact(self):
         pass
 
+class Population():
+    def __init__(self, size, infected_count):
+        self.people = [Person(random.choice(power_immunity) for _ in range(size))]
+        for person in random.sample(self.people, infected_count):
+            person.status = 'exposed'
+
+    def update(self):
+        pass
+
+    def group_by_status(self):
+        groups = defaultdict(list)
+        for person in self.people:
+            groups[person.status].append(person)
+        return groups
+
+    def get_statistics(self):
+        return {status: len(group) for status, group in self.group_by_status().items()}
+
 # Параметры
 infection_probability = 0.1
 base_duration = random.randint(5, 6)
