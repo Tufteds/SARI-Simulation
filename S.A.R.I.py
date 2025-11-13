@@ -9,12 +9,29 @@ from collections import defaultdict
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
 
+def singleton(cls):
+    instances = {}
+    def get_instance(*args, **kwargs):
+        if cls not in instances:
+            instances[cls] = cls(*args, **kwargs)
+        return instances[cls]
+    return get_instance
+
+@singleton
+class Virus():
+    def __init__(self):
+        self.type = 'ОРВИ'
+        self.time_incubation = 2
+        self.base_duration = random.randint(5, 6)
+        self.infection_probability = 0.1
+
 class Person():
     def __init__(self, immunity):
         self.status = 'healthy'
         self.days_infected = 0
         self.incubation = 0
         self.immunity = immunity
+        self.immunity_effects = {'low': 1, 'medium': 0, 'strong': -1}
 
     def update_infections(self):
         if self.status == 'exposed':
@@ -23,7 +40,7 @@ class Person():
                 self.status = 'infected'
         elif self.status == 'infected':
             self.days_infected += 1
-            if self.days_infected >= base_duration + immunity_effects[self.immunity]:
+            if self.days_infected >= base_duration + self.immunity_effects[self.immunity]:
                 self.status = 'cured'
 
     def get_contact(self):
