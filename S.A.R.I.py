@@ -17,6 +17,15 @@ def singleton(cls):
         return instances[cls]
     return get_instance
 
+def resource_path(relative_path):
+    """Возвращает абсолютный путь к ресурсу (иконка, файл и т.д.)"""
+    try:
+        # если это PyInstaller
+        base_path = sys._MEIPASS
+    except AttributeError:
+        base_path = os.path.abspath(".")
+    return os.path.join(base_path, relative_path)
+
 @singleton
 class Virus():
     def __init__(self):
@@ -216,6 +225,6 @@ if __name__ == "__main__":
     root = tk.Tk()
     root.title("Симуляция распространения ОРВИ")
     root.geometry("1500x600")
-    # root.iconbitmap(resource_path("virus.ico"))
+    root.iconbitmap(resource_path("icons/virus.ico"))
     gui = GUI(root)
     root.mainloop()
