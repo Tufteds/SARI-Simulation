@@ -15,8 +15,6 @@ power_immunity = ['low', 'medium', 'strong']
 immunity_effects = {'low': 1, 'medium': 0, 'strong': -1}
 time_incubation = 2
 
-# Добавление в гит
-
 # Глобальные
 graph_canvas = None
 log_output = None
