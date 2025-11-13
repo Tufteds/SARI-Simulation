@@ -75,7 +75,7 @@ class Population():
                         target.status = 'exposed'
                         target.incubation = 0
                         new_infections += 1
-
+        return new_infections
     def group_by_status(self):
         groups = defaultdict(list)
         for person in self.people:
@@ -97,11 +97,32 @@ class Simulation():
 
     def run(self):
         for day in range(self.days):
-            stats = self.population.get_statistics()
-            for status, count in stats.items():
-                self.history[status].append(count)
-            self.log_message(f"День {day + 1}: {stats}")
-            self.population.update()
+            groups = self.population.group_by_status()
+            healthy = len(groups.get('healthy', []))
+            exposed = len(groups.get('exposed', []))
+            infected = len(groups.get('infected', []))
+            cured = len(groups.get('cured', []))
+
+            # сохраняем в history всегда в одном порядке и с 0 по-умолчанию
+            self.history['healthy'].append(healthy)
+            self.history['exposed'].append(exposed)
+            self.history['infected'].append(infected)
+            self.history['cured'].append(cured)
+
+            # Логи в требуемом формате
+            self.log_message(f"--- День {day + 1} ---")
+            self.log_message(
+                f"Здоровые: {healthy}, Подверженные: {exposed}, Заражённые: {infected}, Вылеченные: {cured}")
+
+            # если эпидемия кончилась — останавливаем
+            if (infected == 0 and exposed == 0) or healthy == 0:
+                self.log_message("Симуляция завершена.")
+                break
+
+            # обновляем популяцию — получаем число новых заражённых
+            new_infected = self.population.update()
+            self.log_message(f"Новые заражённые: {new_infected}")
+
         return self.history
 
 class GUI():
@@ -137,12 +158,20 @@ class GUI():
         self.log_output.pack(pady=10, fill='both', expand=True)
 
     def start_simulation(self):
-        pop_size = int(self.population_entry.get())
-        days = int(self.days_entry.get())
+        try:
+            pop_size = int(self.population_entry.get())
+            days = int(self.days_entry.get())
+        except ValueError:
+            messagebox.showerror("Ошибка", "Введите корректные числовые значения!")
+            return
+
+        # очищаем лог перед новой симуляцией
+        self.log_output.delete(1.0, tk.END)
+
+        # запускаем симуляцию и отрисовываем график
         sim = Simulation(pop_size, days, self.log_message)
         sim.run()
         self.draw_graph(sim.history)
-
     def log_message(self, msg):
         self.log_output.insert(tk.END, msg + '\n')
         self.log_output.see(tk.END)
