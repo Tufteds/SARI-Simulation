@@ -160,7 +160,7 @@ def start_simulation():
 root = tk.Tk()
 root.title("Симуляция распространения ОРВИ")
 root.geometry("1500x600")
-root.iconbitmap(resource_path("virus.ico"))
+# root.iconbitmap(resource_path("virus.ico"))
 font = ('Segoe UI', 13)
 
 # Макет
