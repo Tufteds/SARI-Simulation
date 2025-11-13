@@ -91,6 +91,8 @@ class Simulation():
         self.days = days
         self.history = {'healthy': [], 'exposed': [], 'infected': [], 'cured': []}
         self.log_callback = log_callback
+        self.peak_day = 0
+        self.max_infected = 0
 
     def log_message(self, message):
         self.log_callback(message)
@@ -108,6 +110,10 @@ class Simulation():
             self.history['exposed'].append(exposed)
             self.history['infected'].append(infected)
             self.history['cured'].append(cured)
+
+            if infected > self.max_infected:
+                self.max_infected = infected
+                self.peak_day = day
 
             # Логи в требуемом формате
             self.log_message(f"--- День {day + 1} ---")
@@ -171,9 +177,9 @@ class GUI():
         self.log_output.delete(1.0, tk.END)
 
         # запускаем симуляцию и отрисовываем график
-        sim = Simulation(population_size, days, self.log_message)
-        sim.run()
-        self.draw_graph(sim.history)
+        self.sim = Simulation(population_size, days, self.log_message)
+        self.sim.run()
+        self.draw_graph(self.sim.history)
     def log_message(self, msg):
         self.log_output.insert(tk.END, msg + '\n')
         self.log_output.see(tk.END)
@@ -191,9 +197,9 @@ class GUI():
         plot.legend()
         plot.grid(True, linestyle='--', alpha=0.5)
 
-        # plot.plot(peak_day, max_infected, 'ro')  # 'ro' — красная точка
-        # plot.text(peak_day, max_infected, f'Пик болезни\nДень {peak_day + 1}',
-        #           fontsize=10, color='black', ha='center', va='bottom')
+        plot.plot(self.sim.peak_day, self.sim.max_infected, 'ro')  # 'ro' — красная точка
+        plot.text(self.sim.peak_day, self.sim.max_infected, f'Пик болезни\nДень {self.sim.peak_day + 1}',
+                  fontsize=10, color='black', ha='center', va='bottom')
 
         plot.set_xlabel('Дни', color='black')
         plot.set_ylabel('Люди', color='black')
