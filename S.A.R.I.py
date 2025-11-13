@@ -9,6 +9,7 @@ from collections import defaultdict
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
 
+# Декоратор синглтона
 def singleton(cls):
     instances = {}
     def get_instance(*args, **kwargs):
@@ -17,6 +18,7 @@ def singleton(cls):
         return instances[cls]
     return get_instance
 
+# Класс утилит-функций
 class Utils():
     @staticmethod
     def resource_path(relative_path):
@@ -28,6 +30,7 @@ class Utils():
             base_path = os.path.abspath(".")
         return os.path.join(base_path, relative_path)
 
+# Отдельный класс вируса
 @singleton
 class Virus():
     def __init__(self):
@@ -38,6 +41,7 @@ class Virus():
 
 virus = Virus()
 
+# Класс человека
 class Person():
     def __init__(self, immunity):
         self.status = 'healthy'
@@ -46,6 +50,7 @@ class Person():
         self.immunity = immunity
         self.immunity_effects = {'low': 1, 'medium': 0, 'strong': -1}
 
+    # Обновление статуса
     def update_infections(self):
         if self.status == 'exposed':
             self.incubation += 1
@@ -56,15 +61,18 @@ class Person():
             if self.days_infected >= virus.base_duration + self.immunity_effects[self.immunity]:
                 self.status = 'cured'
 
+    # Функиця на будущее
     def get_contact(self):
         pass
 
+# Класс популяции людей
 class Population():
     def __init__(self, size, infected_count):
         self.people = [Person(random.choice(['low', 'medium', 'strong'])) for _ in range(size)]
         for person in random.sample(self.people, infected_count):
             person.status = 'exposed'
 
+    # Обновление статуса
     def update(self):
         groups = self.group_by_status()
         new_infections = 0
@@ -87,15 +95,19 @@ class Population():
                         target.incubation = 0
                         new_infections += 1
         return new_infections
+
+    # Группировка людей по статусу
     def group_by_status(self):
         groups = defaultdict(list)
         for person in self.people:
             groups[person.status].append(person)
         return groups
 
+    # Получение статистики за текущий день
     def get_statistics(self):
         return {status: len(group) for status, group in self.group_by_status().items()}
 
+# Класс симуляции
 class Simulation():
     def __init__(self, population_size, days, log_callback):
         self.population = Population(population_size, round(population_size*0.05))
@@ -105,9 +117,11 @@ class Simulation():
         self.peak_day = 0
         self.max_infected = 0
 
+    # Вывод логов
     def log_message(self, message):
         self.log_callback(message)
 
+    # Запуск симуляции
     def run(self):
         for day in range(self.days):
             groups = self.population.group_by_status()
@@ -116,7 +130,6 @@ class Simulation():
             infected = len(groups.get('infected', []))
             cured = len(groups.get('cured', []))
 
-            # сохраняем в history всегда в одном порядке и с 0 по-умолчанию
             self.history['healthy'].append(healthy)
             self.history['exposed'].append(exposed)
             self.history['infected'].append(infected)
@@ -126,22 +139,20 @@ class Simulation():
                 self.max_infected = infected
                 self.peak_day = day
 
-            # Логи в требуемом формате
             self.log_message(f"--- День {day + 1} ---")
             self.log_message(
                 f"Здоровые: {healthy}, Подверженные: {exposed}, Заражённые: {infected}, Вылеченные: {cured}")
 
-            # если эпидемия кончилась — останавливаем
             if (infected == 0 and exposed == 0) or healthy == 0:
                 self.log_message("Симуляция завершена.")
                 break
 
-            # обновляем популяцию — получаем число новых заражённых
             new_infected = self.population.update()
             self.log_message(f"Новые заражённые: {new_infected}")
 
         return self.history
 
+# Класс графического интерфейса
 class GUI():
     def __init__(self, root):
         self.root = root
@@ -149,6 +160,7 @@ class GUI():
         self.graph_canvas = None
         self.build_ui()
 
+    # Построение окна tkninter
     def build_ui(self):
         self.main_frame = tk.Frame(self.root)
         self.main_frame.pack(fill='both', expand=True)
@@ -179,6 +191,7 @@ class GUI():
         )
         self.log_output.pack(pady=10, fill='both', expand=True)
 
+    # Старт симуляции (по кнопке)
     def start_simulation(self):
         try:
             population_size = int(self.population_entry.get().replace('.', ''))
@@ -189,17 +202,18 @@ class GUI():
             messagebox.showerror("Ошибка", "Пожалуйста, введите корректные значения.")
             return
 
-        # очищаем лог перед новой симуляцией
         self.log_output.delete(1.0, tk.END)
 
-        # запускаем симуляцию и отрисовываем график
         self.sim = Simulation(population_size, days, self.log_message)
         self.sim.run()
         self.draw_graph(self.sim.history)
+
+    # Вывод в GUI
     def log_message(self, msg):
         self.log_output.insert(tk.END, msg + '\n')
         self.log_output.see(tk.END)
 
+    # Отрисовка графика
     def draw_graph(self, history):
         if self.graph_canvas:
             self.graph_canvas.get_tk_widget().destroy()
@@ -228,6 +242,7 @@ class GUI():
         self.graph_canvas.draw()
         self.graph_canvas.get_tk_widget().pack(fill='both', expand=True)
 
+# Запуск программы
 if __name__ == "__main__":
     root = tk.Tk()
     root.title("Симуляция распространения ОРВИ")
