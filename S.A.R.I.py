@@ -9,6 +9,26 @@ from collections import defaultdict
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
 
+class Person():
+    def __init__(self, immunity):
+        self.status = 'healthy'
+        self.days_infected = 0
+        self.incubation = 0
+        self.immunity = immunity
+
+    def update_infections(self):
+        if self.status == 'exposed':
+            self.incubation += 1
+            if self.incubation >= time_incubation:
+                self.status = 'infected'
+        elif self.status == 'infected':
+            self.days_infected += 1
+            if self.days_infected >= base_duration + immunity_effects[self.immunity]:
+                self.status = 'cured'
+
+    def get_contact(self):
+        pass
+
 # Параметры
 infection_probability = 0.1
 base_duration = random.randint(5, 6)
