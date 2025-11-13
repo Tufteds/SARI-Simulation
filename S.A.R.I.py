@@ -50,12 +50,31 @@ class Person():
 
 class Population():
     def __init__(self, size, infected_count):
-        self.people = [Person(random.choice(['low', 'medium', 'strong']) for _ in range(size))]
+        self.people = [Person(random.choice(['low', 'medium', 'strong'])) for _ in range(size)]
         for person in random.sample(self.people, infected_count):
             person.status = 'exposed'
 
     def update(self):
-        pass
+        groups = self.group_by_status()
+        new_infections = 0
+
+        for person in self.people:
+            person.update_infections()
+
+        infected_group = groups['infected']
+        healthy_group = groups['healthy']
+
+        if infected_group and healthy_group:
+            random.shuffle(healthy_group)
+            for infected_person in infected_group:
+                for _ in range(2):
+                    if not healthy_group:
+                        break
+                    target = healthy_group.pop()
+                    if random.random() < virus.infection_probability:
+                        target.status = 'exposed'
+                        target.incubation = 0
+                        new_infections += 1
 
     def group_by_status(self):
         groups = defaultdict(list)
@@ -88,6 +107,7 @@ class Simulation():
 class GUI():
     def __init__(self, root):
         self.root = root
+        self.build_ui()
 
     def build_ui(self):
         self.left_frame = tk.Frame(self.root)
@@ -135,5 +155,7 @@ class GUI():
 
 if __name__ == "__main__":
     root = tk.Tk()
+    root.title("Симуляция ОРВИ (ООП)")
+    root.geometry("1500x600")
     gui = GUI(root)
     root.mainloop()
