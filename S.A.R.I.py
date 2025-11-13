@@ -107,26 +107,34 @@ class Simulation():
 class GUI():
     def __init__(self, root):
         self.root = root
+        self.font = ('Segoe UI', 13)
+        self.graph_canvas = None
         self.build_ui()
 
+
     def build_ui(self):
-        self.left_frame = tk.Frame(self.root)
+        self.main_frame = tk.Frame(self.root)
+        self.main_frame.pack(fill='both', expand=True)
+
+        self.left_frame = tk.Frame(self.main_frame)
         self.left_frame.pack(side='left', fill='both', expand=True, padx=10, pady=10)
 
-        self.right_frame = tk.Frame(self.root)
+        self.right_frame = tk.Frame(self.main_frame)
         self.right_frame.pack(side='right', fill='both', expand=True, padx=10, pady=10)
 
-        self.log_output = scrolledtext.ScrolledText(self.left_frame, height=20)
-        self.log_output.pack(fill='both', expand=True, pady=10)
-
-        self.population_entry = tk.Entry(self.left_frame)
+        tk.Label(self.left_frame, text="Размер популяции:", font=self.font).pack(pady=5)
+        self.population_entry = tk.Entry(self.left_frame, font=self.font)
         self.population_entry.pack(pady=5)
-        self.days_entry = tk.Entry(self.left_frame)
+
+        tk.Label(self.left_frame, text="Количество дней симуляции:", font=self.font).pack(pady=5)
+        self.days_entry = tk.Entry(self.left_frame, font=self.font)
         self.days_entry.pack(pady=5)
 
-        tk.Button(
-            self.left_frame, text="🚀 Запустить", command=self.start_simulation
-        ).pack(pady=10)
+        tk.Button(self.left_frame, text="🚀 Запустить симуляцию", font=self.font, command=self.start_simulation).pack(
+            pady=10)
+
+        self.log_output = scrolledtext.ScrolledText(self.left_frame, height=20, font=('Consolas', 11))
+        self.log_output.pack(pady=10, fill='both', expand=True)
 
     def start_simulation(self):
         pop_size = int(self.population_entry.get())
@@ -140,6 +148,9 @@ class GUI():
         self.log_output.see(tk.END)
 
     def draw_graph(self, history):
+        if self.graph_canvas:
+            self.graph_canvas.get_tk_widget().destroy()
+
         fig = Figure(figsize=(6, 4), dpi=100)
         plot = fig.add_subplot(111)
         plot.plot(history['healthy'], label='Здоровые', color='green')
@@ -149,13 +160,14 @@ class GUI():
         plot.legend()
         plot.grid(True, linestyle='--', alpha=0.5)
 
-        canvas = FigureCanvasTkAgg(fig, master=self.right_frame)
-        canvas.draw()
-        canvas.get_tk_widget().pack(fill='both', expand=True)
+        self.graph_canvas = FigureCanvasTkAgg(fig, master=self.right_frame)
+        self.graph_canvas.draw()
+        self.graph_canvas.get_tk_widget().pack(fill='both', expand=True)
 
 if __name__ == "__main__":
     root = tk.Tk()
-    root.title("Симуляция ОРВИ (ООП)")
+    root.title("Симуляция распространения ОРВИ")
     root.geometry("1500x600")
+    # root.iconbitmap(resource_path("virus.ico"))
     gui = GUI(root)
     root.mainloop()
