@@ -47,6 +47,24 @@ class Population():
     def get_statistics(self):
         return {status: len(group) for status, group in self.group_by_status().items()}
 
+class Simulation():
+    def __init__(self, population_size, days, log_callback):
+        self.population = Population(population_size, round(population_size*0.05))
+        self.days = days
+        self.history = {'healthy': [], 'exposed': [], 'infected': [], 'cured': []}
+        self.log_callback = log_callback
+
+    def log_message(self, message):
+        self.log_callback(message)
+
+    def run(self):
+        for day in range(self.days):
+            stats = self.population.get_statistics()
+            for status, count in stats.items():
+                self.history[status].append(count)
+            self.log_message(f"День {day + 1}: {stats}")
+            self.population.update()
+
 # Параметры
 infection_probability = 0.1
 base_duration = random.randint(5, 6)
