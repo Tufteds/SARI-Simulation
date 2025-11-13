@@ -159,17 +159,19 @@ class GUI():
 
     def start_simulation(self):
         try:
-            pop_size = int(self.population_entry.get())
-            days = int(self.days_entry.get())
+            population_size = int(self.population_entry.get().replace('.', ''))
+            days = int(self.days_entry.get().replace('.', ''))
+            if population_size <= 0 or days <= 0:
+                raise ValueError
         except ValueError:
-            messagebox.showerror("Ошибка", "Введите корректные числовые значения!")
+            messagebox.showerror("Ошибка", "Пожалуйста, введите корректные значения.")
             return
 
         # очищаем лог перед новой симуляцией
         self.log_output.delete(1.0, tk.END)
 
         # запускаем симуляцию и отрисовываем график
-        sim = Simulation(pop_size, days, self.log_message)
+        sim = Simulation(population_size, days, self.log_message)
         sim.run()
         self.draw_graph(sim.history)
     def log_message(self, msg):
