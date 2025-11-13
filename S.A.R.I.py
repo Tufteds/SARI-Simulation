@@ -147,22 +147,12 @@ class GUI():
         self.graph_canvas = None
         self.build_ui()
 
-
     def build_ui(self):
         self.main_frame = tk.Frame(self.root)
         self.main_frame.pack(fill='both', expand=True)
 
-<<<<<<< HEAD
-# Интерфейс
-root = tk.Tk()
-root.title("Симуляция распространения ОРВИ")
-root.geometry("1500x600")
-# root.iconbitmap(resource_path("virus.ico"))
-font = ('Segoe UI', 13)
-=======
         self.left_frame = tk.Frame(self.main_frame)
         self.left_frame.pack(side='left', fill='both', expand=True, padx=10, pady=10)
->>>>>>> develop
 
         self.right_frame = tk.Frame(self.main_frame)
         self.right_frame.pack(side='right', fill='both', expand=True, padx=10, pady=10)
@@ -175,10 +165,16 @@ font = ('Segoe UI', 13)
         self.days_entry = tk.Entry(self.left_frame, font=self.font)
         self.days_entry.pack(pady=5)
 
-        tk.Button(self.left_frame, text="🚀 Запустить симуляцию", font=self.font, command=self.start_simulation).pack(
-            pady=10)
+        tk.Button(
+            self.left_frame,
+            text="🚀 Запустить симуляцию",
+            font=self.font,
+            command=self.start_simulation
+        ).pack(pady=10)
 
-        self.log_output = scrolledtext.ScrolledText(self.left_frame, height=20, font=('Consolas', 11))
+        self.log_output = scrolledtext.ScrolledText(
+            self.left_frame, height=20, font=('Consolas', 11)
+        )
         self.log_output.pack(pady=10, fill='both', expand=True)
 
     def start_simulation(self):
