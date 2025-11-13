@@ -25,6 +25,8 @@ class Virus():
         self.base_duration = random.randint(5, 6)
         self.infection_probability = 0.1
 
+virus = Virus()
+
 class Person():
     def __init__(self, immunity):
         self.status = 'healthy'
@@ -36,11 +38,11 @@ class Person():
     def update_infections(self):
         if self.status == 'exposed':
             self.incubation += 1
-            if self.incubation >= time_incubation:
+            if self.incubation >= virus.time_incubation:
                 self.status = 'infected'
         elif self.status == 'infected':
             self.days_infected += 1
-            if self.days_infected >= base_duration + self.immunity_effects[self.immunity]:
+            if self.days_infected >= virus.base_duration + self.immunity_effects[self.immunity]:
                 self.status = 'cured'
 
     def get_contact(self):
@@ -48,7 +50,7 @@ class Person():
 
 class Population():
     def __init__(self, size, infected_count):
-        self.people = [Person(random.choice(power_immunity) for _ in range(size))]
+        self.people = [Person(random.choice(['low', 'medium', 'strong']) for _ in range(size))]
         for person in random.sample(self.people, infected_count):
             person.status = 'exposed'
 
