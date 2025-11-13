@@ -191,6 +191,17 @@ class GUI():
         plot.legend()
         plot.grid(True, linestyle='--', alpha=0.5)
 
+        # plot.plot(peak_day, max_infected, 'ro')  # 'ro' — красная точка
+        # plot.text(peak_day, max_infected, f'Пик болезни\nДень {peak_day + 1}',
+        #           fontsize=10, color='black', ha='center', va='bottom')
+
+        plot.set_xlabel('Дни', color='black')
+        plot.set_ylabel('Люди', color='black')
+        plot.set_title('ОРВИ Симуляция', color='black')
+        plot.tick_params(colors='black')
+        plot.grid(True, linestyle='--', alpha=0.5)
+        plot.legend()
+
         self.graph_canvas = FigureCanvasTkAgg(fig, master=self.right_frame)
         self.graph_canvas.draw()
         self.graph_canvas.get_tk_widget().pack(fill='both', expand=True)
