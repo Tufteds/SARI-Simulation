@@ -179,38 +179,32 @@ class GUI():
         self.right_frame = tk.Frame(self.main_frame)
         self.right_frame.pack(side='right', fill='both', expand=True, padx=10, pady=10)
 
-        # Шрифт для всех элементов ввода
         self.font = ('Segoe UI', 13)
 
-        # Поле ввода размера популяции
         tk.Label(self.left_frame, text="Размер популяции:", font=self.font).pack(pady=5)
         self.population_entry = tk.Entry(self.left_frame, font=self.font, width=20)
         self.population_entry.pack(pady=5)
 
-        # Поле ввода количества дней
         tk.Label(self.left_frame, text="Количество дней симуляции:", font=self.font).pack(pady=5)
         self.days_entry = tk.Entry(self.left_frame, font=self.font, width=20)
         self.days_entry.pack(pady=5)
-
-        # Выпадающий список выбора типа модели
         tk.Label(self.left_frame, text="Тип модели:", font=self.font).pack(pady=5)
         self.model_var = tk.StringVar()
         self.model_combobox = ttk.Combobox(
             self.left_frame,
             textvariable=self.model_var,
-            state='readonly',  # запрет ручного ввода
+            state='readonly',
             values=['Выберите тип модели', 'Агентная', 'Математическая', 'Гибридная'],
-            width=20,  # ширина как у Entry
+            width=20,
             font=self.font,
-            height=5  # сколько элементов видно при раскрытии
+            height=5
         )
-        self.model_combobox.current(0)  # первый элемент по умолчанию
+        self.model_combobox.current(0)
         self.model_combobox.pack(pady=5)
 
         def remove_placeholder(event):
             current = self.model_var.get()
             if current != "Выберите тип модели":
-                # Обновляем список без плейсхолдера
                 self.model_combobox['values'] = ['Агентная', 'Математическая', 'Гибридная']
 
         self.model_combobox.bind("<<ComboboxSelected>>", remove_placeholder)
