@@ -5,6 +5,7 @@ import random
 from tkinter import messagebox, scrolledtext, ttk
 from collections import defaultdict
 from abc import ABC, abstractmethod
+from PIL import Image, ImageTk
 
 # --- Сторонние библиотеки ---
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
@@ -214,46 +215,42 @@ class GUI():
         self.graph_canvas = None
         self.build_ui()
 
+    def open_advanced_settings(self):
+        top = tk.Toplevel(self.root)
+        top.title("Расширенные настройки")
+        top.geometry("400x300")
+        tk.Label(top, text="Здесь будут расширенные настройки", font=self.font).pack(pady=20)
+        tk.Button(top, text="Закрыть", command=top.destroy).pack(pady=20)
+
     def build_ui(self):
         self.main_frame = tk.Frame(self.root)
         self.main_frame.pack(fill='both', expand=True)
 
+        # Левый фрейм для управления
         self.left_frame = tk.Frame(self.main_frame)
         self.left_frame.pack(side='left', fill='both', expand=True, padx=10, pady=10)
 
+        # Правый фрейм для графика
         self.right_frame = tk.Frame(self.main_frame)
         self.right_frame.pack(side='right', fill='both', expand=True, padx=10, pady=10)
 
-        # Фрейм-заглушка с точным размером
-        self.graph_placeholder = tk.Frame(
-            self.right_frame,
-            width=625,  # ширина в пикселях
-            height=600,  # высота в пикселях
-            bg='white',
-            relief='ridge',
-            bd=2
-        )
-        self.graph_placeholder.pack(padx=10, pady=10)
-        self.graph_placeholder.pack_propagate(False)  # фиксируем размер
-
-        # Текст по центру
-        label = tk.Label(
-            self.graph_placeholder,
-            text="Место для графика",
-            font=('Segoe UI', 16),
-            fg='gray',
-            bg='white'
-        )
-        label.place(relx=0.5, rely=0.5, anchor='center')
+        # ---------- Заголовок ----------
+        tk.Label(
+            self.left_frame,
+            text="Основные параметры",
+            font=('Segoe UI', 16, 'bold'),
+            fg='black'
+        ).grid(row=0, column=0, columnspan=4, pady=(0, 10))
 
         # ---------- Матрица ввода ----------
         # Размер популяции
-        tk.Label(self.left_frame, text="Размер популяции:", font=self.font).grid(row=0, column=0, sticky='w', padx=5, pady=5)
+        tk.Label(self.left_frame, text="Размер популяции:", font=self.font).grid(row=1, column=0, sticky='w', padx=5,
+                                                                                 pady=5)
         self.population_entry = tk.Entry(self.left_frame, font=self.font, width=20)
-        self.population_entry.grid(row=0, column=1, padx=5, pady=5)
+        self.population_entry.grid(row=1, column=1, padx=5, pady=5, sticky='w')
 
         # Тип модели
-        tk.Label(self.left_frame, text="Тип модели:", font=self.font).grid(row=0, column=2, sticky='w', padx=5, pady=5)
+        tk.Label(self.left_frame, text="Тип модели:", font=self.font).grid(row=1, column=2, sticky='w', padx=5, pady=5)
         self.model_var = tk.StringVar()
         self.model_combobox = ttk.Combobox(
             self.left_frame,
@@ -264,15 +261,16 @@ class GUI():
             font=self.font
         )
         self.model_combobox.current(0)
-        self.model_combobox.grid(row=0, column=3, padx=5, pady=5)
+        self.model_combobox.grid(row=1, column=3, padx=(0, 5), pady=5, sticky='w')
 
         # Количество дней
-        tk.Label(self.left_frame, text="Количество дней:", font=self.font).grid(row=1, column=0, sticky='w', padx=5, pady=5)
+        tk.Label(self.left_frame, text="Количество дней:", font=self.font).grid(row=2, column=0, sticky='w', padx=5,
+                                                                                pady=5)
         self.days_entry = tk.Entry(self.left_frame, font=self.font, width=20)
-        self.days_entry.grid(row=1, column=1, padx=5, pady=5)
+        self.days_entry.grid(row=2, column=1, padx=5, pady=5, sticky='w')
 
         # Тип графика
-        tk.Label(self.left_frame, text="Тип графика:", font=self.font).grid(row=1, column=2, sticky='w', padx=5, pady=5)
+        tk.Label(self.left_frame, text="Тип графика:", font=self.font).grid(row=2, column=2, sticky='w', padx=5, pady=5)
         self.chart_type_var = tk.StringVar()
         self.chart_type_combobox = ttk.Combobox(
             self.left_frame,
@@ -283,25 +281,54 @@ class GUI():
             font=self.font
         )
         self.chart_type_combobox.current(0)
-        self.chart_type_combobox.grid(row=1, column=3, padx=5, pady=5)
+        self.chart_type_combobox.grid(row=2, column=3, padx=(0, 5), pady=5, sticky='w')
 
-        # ---------- Кнопка запуска ----------
+        # ---------- Кнопки ----------
         tk.Button(
             self.left_frame,
             text="🚀 Запустить симуляцию",
             font=self.font,
             command=self.start_simulation
-        ).grid(row=2, column=0, columnspan=4, pady=10, sticky='we')
+        ).grid(row=3, column=1, pady=10, padx=(0, 10))
+
+        tk.Button(
+            self.left_frame,
+            text="⚙ Расширенные настройки",
+            font=self.font,
+            command=self.open_advanced_settings
+        ).grid(row=3, column=2, pady=10, padx=(10, 0))
 
         # ---------- Лог ----------
         self.log_output = scrolledtext.ScrolledText(
             self.left_frame, height=20, font=('Consolas', 11)
         )
-        self.log_output.grid(row=3, column=0, columnspan=4, pady=10, sticky='nsew')
+        self.log_output.grid(row=4, column=0, columnspan=4, pady=10, sticky='nsew')
 
-        # Делаем левый фрейм растягиваемым
-        self.left_frame.grid_rowconfigure(3, weight=1)
-        self.left_frame.grid_columnconfigure((0,1,2,3), weight=1)
+        # Растяжение левого фрейма
+        self.left_frame.grid_rowconfigure(4, weight=1)
+        self.left_frame.grid_columnconfigure((0, 1, 2, 3), weight=1)
+
+        # ---------- Заглушка графика ----------
+        self.graph_placeholder = tk.Frame(
+            self.right_frame,
+            width=625,
+            height=600,
+            bg='white',
+            relief='ridge',
+            bd=2
+        )
+        self.graph_placeholder.pack(padx=10, pady=10)
+        self.graph_placeholder.pack_propagate(False)
+
+        # Текст по центру заглушки
+        label = tk.Label(
+            self.graph_placeholder,
+            text="Место для графика",
+            font=('Segoe UI', 16),
+            fg='gray',
+            bg='white'
+        )
+        label.place(relx=0.5, rely=0.5, anchor='center')
 
     # ---------- Старт симуляции ----------
     def start_simulation(self):
