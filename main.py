@@ -4,6 +4,7 @@ import tkinter as tk
 import random
 from tkinter import messagebox, scrolledtext, ttk
 from collections import defaultdict
+from abc import ABC, abstractmethod
 
 # --- Сторонние библиотеки ---
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
@@ -151,6 +152,24 @@ class Simulation():
             self.log_message(f"Новые заражённые: {new_infected}")
 
         return self.history
+
+class BaseModel(ABC):
+    def __init__(self, population_size, days):
+        self.population_size = population_size
+        self.days = days
+        self.history = {}
+
+    @abstractmethod
+    def run(self):
+        pass
+
+class AgentBasedModel(BaseModel):
+    def run(self):
+        pass
+
+class MathematicalModel(BaseModel):
+    def run(self):
+        pass
 
 # Класс графического интерфейса
 class GUI():
