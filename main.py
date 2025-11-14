@@ -5,7 +5,6 @@ import random
 from tkinter import messagebox, scrolledtext, ttk
 from collections import defaultdict
 from abc import ABC, abstractmethod
-from PIL import Image, ImageTk
 
 # --- Сторонние библиотеки ---
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
@@ -190,10 +189,19 @@ class MathematicalModel(BaseModel):
             self.I += new_infected - new_recovered
             self.R += new_recovered
 
-            self.history['healthy'].append(int(self.S))
-            self.history['exposed'].append(int(self.E))
-            self.history['infected'].append(int(self.I))
-            self.history['cured'].append(int(self.R))
+            current_S = max(0, int(self.S))
+            current_E = max(0, int(self.E))
+            current_I = max(0, int(self.I))
+            current_R = max(0, int(self.R))
+
+            self.history['healthy'].append(current_S)
+            self.history['exposed'].append(current_E)
+            self.history['infected'].append(current_I)
+            self.history['cured'].append(current_R)
+
+            if current_I > self.max_infected:
+                self.max_infected = current_I
+                self.peak_day = day
 
             # Лог
             log_callback(f"--- День {day+1} ---")
