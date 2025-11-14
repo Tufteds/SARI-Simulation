@@ -184,6 +184,10 @@ class MathematicalModel(BaseModel):
             new_infected = self.sigma * self.E
             new_recovered = self.gamma * self.I
 
+            if self.I < 0.5 and self.E < 0.5:
+                log_callback(f"Эпидемия завершилась на дне {day}.")
+                break
+
             self.S -= new_exposed
             self.E += new_exposed - new_infected
             self.I += new_infected - new_recovered
