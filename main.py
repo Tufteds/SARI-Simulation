@@ -224,6 +224,28 @@ class GUI():
         self.right_frame = tk.Frame(self.main_frame)
         self.right_frame.pack(side='right', fill='both', expand=True, padx=10, pady=10)
 
+        # Фрейм-заглушка с точным размером
+        self.graph_placeholder = tk.Frame(
+            self.right_frame,
+            width=625,  # ширина в пикселях
+            height=600,  # высота в пикселях
+            bg='white',
+            relief='ridge',
+            bd=2
+        )
+        self.graph_placeholder.pack(padx=10, pady=10)
+        self.graph_placeholder.pack_propagate(False)  # фиксируем размер
+
+        # Текст по центру
+        label = tk.Label(
+            self.graph_placeholder,
+            text="Место для графика",
+            font=('Segoe UI', 16),
+            fg='gray',
+            bg='white'
+        )
+        label.place(relx=0.5, rely=0.5, anchor='center')
+
         # ---------- Матрица ввода ----------
         # Размер популяции
         tk.Label(self.left_frame, text="Размер популяции:", font=self.font).grid(row=0, column=0, sticky='w', padx=5, pady=5)
@@ -320,6 +342,10 @@ class GUI():
 
     # ---------- Отрисовка графика ----------
     def draw_graph(self, history):
+        if hasattr(self, 'graph_placeholder') and self.graph_placeholder:
+            self.graph_placeholder.pack_forget()
+            self.graph_placeholder = None
+
         if self.graph_canvas:
             self.graph_canvas.get_tk_widget().destroy()
 
