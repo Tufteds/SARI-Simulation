@@ -108,51 +108,6 @@ class Population():
     def get_statistics(self):
         return {status: len(group) for status, group in self.group_by_status().items()}
 
-# Класс симуляции
-class Simulation():
-    def __init__(self, population_size, days, log_callback):
-        self.population = Population(population_size, round(population_size*0.05))
-        self.days = days
-        self.history = {'healthy': [], 'exposed': [], 'infected': [], 'cured': []}
-        self.log_callback = log_callback
-        self.peak_day = 0
-        self.max_infected = 0
-
-    # Вывод логов
-    def log_message(self, message):
-        self.log_callback(message)
-
-    # Запуск симуляции
-    def run(self):
-        for day in range(self.days):
-            groups = self.population.group_by_status()
-            healthy = len(groups.get('healthy', []))
-            exposed = len(groups.get('exposed', []))
-            infected = len(groups.get('infected', []))
-            cured = len(groups.get('cured', []))
-
-            self.history['healthy'].append(healthy)
-            self.history['exposed'].append(exposed)
-            self.history['infected'].append(infected)
-            self.history['cured'].append(cured)
-
-            if infected > self.max_infected:
-                self.max_infected = infected
-                self.peak_day = day
-
-            self.log_message(f"--- День {day + 1} ---")
-            self.log_message(
-                f"Здоровые: {healthy}, Подверженные: {exposed}, Заражённые: {infected}, Вылеченные: {cured}")
-
-            if (infected == 0 and exposed == 0) or healthy == 0:
-                self.log_message("Симуляция завершена.")
-                break
-
-            new_infected = self.population.update()
-            self.log_message(f"Новые заражённые: {new_infected}")
-
-        return self.history
-
 class BaseModel(ABC):
     def __init__(self, population_size, days):
         self.population_size = population_size
@@ -291,8 +246,14 @@ class GUI():
 
         self.log_output.delete(1.0, tk.END)
 
-        self.sim = Simulation(population_size, days, self.log_message)
-        self.sim.run()
+        if selected_model == 'Агентная':
+            self.sim = AgentBasedModel(population_size, days)
+        elif selected_model == 'Математическая':
+            self.sim = MathematicalModel(population_size, days)
+        else:
+            messagebox.showerror("Ошибка", "Выбранный тип модели не поддерживается!")
+            return
+        self.sim.run(self.log_message)
         self.draw_graph(self.sim.history)
 
     # Вывод в GUI
