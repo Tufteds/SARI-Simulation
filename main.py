@@ -2,7 +2,7 @@
 import os, sys
 import tkinter as tk
 import random
-from tkinter import messagebox, scrolledtext
+from tkinter import messagebox, scrolledtext, ttk
 from collections import defaultdict
 
 # --- Сторонние библиотеки ---
@@ -36,7 +36,7 @@ class Virus():
     def __init__(self):
         self.type = 'ОРВИ'
         self.time_incubation = 2
-        self.base_duration = random.randint(5, 6)
+        self.base_duration = random.randint(5, 7)
         self.infection_probability = 0.1
 
 virus = Virus()
@@ -171,14 +171,43 @@ class GUI():
         self.right_frame = tk.Frame(self.main_frame)
         self.right_frame.pack(side='right', fill='both', expand=True, padx=10, pady=10)
 
+        # Шрифт для всех элементов ввода
+        self.font = ('Segoe UI', 13)
+
+        # Поле ввода размера популяции
         tk.Label(self.left_frame, text="Размер популяции:", font=self.font).pack(pady=5)
-        self.population_entry = tk.Entry(self.left_frame, font=self.font)
+        self.population_entry = tk.Entry(self.left_frame, font=self.font, width=20)
         self.population_entry.pack(pady=5)
 
+        # Поле ввода количества дней
         tk.Label(self.left_frame, text="Количество дней симуляции:", font=self.font).pack(pady=5)
-        self.days_entry = tk.Entry(self.left_frame, font=self.font)
+        self.days_entry = tk.Entry(self.left_frame, font=self.font, width=20)
         self.days_entry.pack(pady=5)
 
+        # Выпадающий список выбора типа модели
+        tk.Label(self.left_frame, text="Тип модели:", font=self.font).pack(pady=5)
+        self.model_var = tk.StringVar()
+        self.model_combobox = ttk.Combobox(
+            self.left_frame,
+            textvariable=self.model_var,
+            state='readonly',  # запрет ручного ввода
+            values=['Выберите тип модели', 'Агентная', 'Математическая', 'Гибридная'],
+            width=20,  # ширина как у Entry
+            font=self.font,
+            height=5  # сколько элементов видно при раскрытии
+        )
+        self.model_combobox.current(0)  # первый элемент по умолчанию
+        self.model_combobox.pack(pady=5)
+
+        def remove_placeholder(event):
+            current = self.model_var.get()
+            if current != "Выберите тип модели":
+                # Обновляем список без плейсхолдера
+                self.model_combobox['values'] = ['Агентная', 'Математическая', 'Гибридная']
+
+        self.model_combobox.bind("<<ComboboxSelected>>", remove_placeholder)
+
+        # Кнопка запуска
         tk.Button(
             self.left_frame,
             text="🚀 Запустить симуляцию",
@@ -186,6 +215,7 @@ class GUI():
             command=self.start_simulation
         ).pack(pady=10)
 
+        # Лог
         self.log_output = scrolledtext.ScrolledText(
             self.left_frame, height=20, font=('Consolas', 11)
         )
@@ -196,8 +226,12 @@ class GUI():
         try:
             population_size = int(self.population_entry.get().replace('.', ''))
             days = int(self.days_entry.get().replace('.', ''))
+            selected_model = self.model_var.get()
             if population_size <= 0 or days <= 0:
                 raise ValueError
+            if selected_model == "Выберите тип модели":
+                messagebox.showwarning("Ошибка", "Пожалуйста, выберите тип модели!")
+                return
         except ValueError:
             messagebox.showerror("Ошибка", "Пожалуйста, введите корректные значения.")
             return
