@@ -38,7 +38,7 @@ class Virus():
         self.type = 'ОРВИ'
         self.time_incubation = 2
         self.base_duration = random.randint(5, 7)
-        self.infection_probability = 0.1
+        self.infection_probability = 0.2
 
 virus = Virus()
 
@@ -157,6 +157,52 @@ class AgentBasedModel(BaseModel):
         return self.history
 
 class MathematicalModel(BaseModel):
+    def __init__(self, population_size, days):
+        super().__init__(population_size, days)
+        self.population = Population(population_size, round(population_size * 0.05))
+        self.history = {'healthy': [], 'exposed': [], 'infected': [], 'cured': []}
+        self.peak_day = 0
+        self.max_infected = 0
+
+        # Параметры SEIR
+        self.beta = 0.3
+        self.sigma = 1/2
+        self.gamma = 1/6
+
+        # Начальные состояния
+        initial_infected = round(population_size * 0.05)
+        self.S = population_size - initial_infected
+        self.E = initial_infected
+        self.I = 0
+        self.R = 0
+
+        self.history = {'healthy': [], 'exposed': [], 'infected': [], 'cured': []}
+
+    def run(self, log_callback):
+        for day in range(self.days):
+            new_exposed = self.beta * self.S * self.I / self.population_size
+            new_infected = self.sigma * self.E
+            new_recovered = self.gamma * self.I
+
+            self.S -= new_exposed
+            self.E += new_exposed - new_infected
+            self.I += new_infected - new_recovered
+            self.R += new_recovered
+
+            self.history['healthy'].append(int(self.S))
+            self.history['exposed'].append(int(self.E))
+            self.history['infected'].append(int(self.I))
+            self.history['cured'].append(int(self.R))
+
+            # Лог
+            log_callback(f"--- День {day+1} ---")
+            log_callback(
+                f"Здоровые: {int(self.S)}, Подверженные: {int(self.E)}, Заражённые: {int(self.I)}, Вылеченные: {int(self.R)}"
+            )
+
+        return self.history
+
+class HybrydModel(BaseModel):
     def run(self, log_callback):
         pass
 
