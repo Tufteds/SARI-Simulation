@@ -9,6 +9,7 @@ from abc import ABC, abstractmethod
 # --- Сторонние библиотеки ---
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
+from matplotlib.animation import FuncAnimation
 
 # Декоратор синглтона
 def singleton(cls):
@@ -288,7 +289,7 @@ class GUI():
             self.left_frame,
             textvariable=self.chart_type_var,
             state='readonly',
-            values=['Линейный', 'Круговой'],
+            values=['Линейный', 'Круговой', 'Столбчатый'],
             width=20,
             font=self.font
         )
@@ -390,27 +391,58 @@ class GUI():
 
         chart_type = self.chart_type_var.get()
         fig = Figure(figsize=(6, 4), dpi=100)
+        plot = fig.add_subplot(111)
 
-        if chart_type == 'Линейный':
-            plot = fig.add_subplot(111)
-            plot.plot(history['healthy'], label='Здоровые', color='green')
-            plot.plot(history['exposed'], label='Подверженные', color='orange')
-            plot.plot(history['infected'], label='Заражённые', color='red')
-            plot.plot(history['cured'], label='Вылеченные', color='blue')
+        # Подготовка канвы
+        self.graph_canvas = FigureCanvasTkAgg(fig, master=self.right_frame)
+        canvas_widget = self.graph_canvas.get_tk_widget()
+        canvas_widget.pack(fill='both', expand=True)
+
+        # Берём данные
+        days = list(range(len(history['infected'])))
+        healthy = history['healthy']
+        exposed = history['exposed']
+        infected = history['infected']
+        cured = history['cured']
+
+        # ===== АНИМИРОВАННЫЙ ЛИНЕЙНЫЙ ГРАФИК =====
+        if chart_type == "Линейный":  # теперь анимация
+            plot.set_xlim(0, len(days))
+            plot.set_ylim(0, max(healthy + exposed + infected + cured))
+
+            line_h, = plot.plot([], [], label='Здоровые', color='green')
+            line_e, = plot.plot([], [], label='Подверженные', color='orange')
+            line_i, = plot.plot([], [], label='Заражённые', color='red')
+            line_c, = plot.plot([], [], label='Вылеченные', color='blue')
+
             plot.set_xlabel('Дни')
             plot.set_ylabel('Люди')
-            plot.set_title('ОРВИ Симуляция')
+            plot.set_title('Симуляция')
             plot.legend()
             plot.grid(True, linestyle='--', alpha=0.5)
 
-            if hasattr(self.sim, 'peak_day') and hasattr(self.sim, 'max_infected'):
-                plot.scatter(self.sim.peak_day, self.sim.max_infected, color='red', s=100, zorder=5)
-                plot.text(self.sim.peak_day, self.sim.max_infected, f'день {self.sim.peak_day}', color='red',
-                          fontsize=10,
-                          ha='left', va='bottom')
+            # Функция обновления кадров
+            def update(frame):
+                line_h.set_data(days[:frame], healthy[:frame])
+                line_e.set_data(days[:frame], exposed[:frame])
+                line_i.set_data(days[:frame], infected[:frame])
+                line_c.set_data(days[:frame], cured[:frame])
 
-        elif chart_type == 'Круговой':
-            plot = fig.add_subplot(111)
+                # ВАЖНО! Обновляем TK-контейнер
+                self.graph_canvas.draw()
+
+                return line_h, line_e, line_i, line_c
+
+            # Запуск анимации
+            self.animation = FuncAnimation(fig, update,
+                                           frames=len(days),
+                                           interval=40,
+                                           repeat=False)
+
+            return  # выходим чтобы не рисовать ничего больше
+
+        # ===== если выбрана Круговая =====
+        elif chart_type == "Круговой":
             sizes = [
                 sum(history['healthy']) / len(history['healthy']),
                 sum(history['exposed']) / len(history['exposed']),
@@ -422,9 +454,27 @@ class GUI():
                      colors=['green', 'orange', 'red', 'blue'])
             plot.set_title(f'Статистика симуляции')
 
-        self.graph_canvas = FigureCanvasTkAgg(fig, master=self.right_frame)
+        # ===== если выбрана Столбчатая =====
+        elif chart_type == "Столбчатый":
+            days_idx = list(range(1, len(healthy) + 1))
+
+            plot.bar(days_idx, healthy, label='Здоровые', color='green')
+            plot.bar(days_idx, exposed, bottom=healthy, label='Подверженные', color='orange')
+            plot.bar(days_idx, infected,
+                     bottom=[healthy[i] + exposed[i] for i in range(len(days_idx))],
+                     label='Заражённые', color='red')
+            plot.bar(days_idx, cured,
+                     bottom=[healthy[i] + exposed[i] + infected[i] for i in range(len(days_idx))],
+                     label='Вылеченные', color='blue')
+
+            plot.legend()
+            plot.set_xlabel("Дни")
+            plot.set_ylabel("Количество людей")
+            plot.set_title("Столбчатая диаграмма")
+            plot.grid(axis='y', linestyle='--', alpha=0.5)
+
+        # Рисуем итог
         self.graph_canvas.draw()
-        self.graph_canvas.get_tk_widget().pack(fill='both', expand=True)
 
 # Запуск программы
 if __name__ == "__main__":
