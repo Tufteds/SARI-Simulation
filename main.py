@@ -160,15 +160,49 @@ class BaseModel(ABC):
         self.history = {}
 
     @abstractmethod
-    def run(self):
+    def run(self,log_callback):
         pass
 
 class AgentBasedModel(BaseModel):
-    def run(self):
-        pass
+    def __init__(self, population_size, days):
+        super().__init__(population_size, days)
+        self.population = Population(population_size, round(population_size * 0.05))
+        self.history = {'healthy': [], 'exposed': [], 'infected': [], 'cured': []}
+        self.peak_day = 0
+        self.max_infected = 0
+
+    def run(self, log_callback):
+        for day in range(self.days):
+            groups = self.population.group_by_status()
+            healthy = len(groups.get('healthy', []))
+            exposed = len(groups.get('exposed', []))
+            infected = len(groups.get('infected', []))
+            cured = len(groups.get('cured', []))
+
+            self.history['healthy'].append(healthy)
+            self.history['exposed'].append(exposed)
+            self.history['infected'].append(infected)
+            self.history['cured'].append(cured)
+
+            if infected > self.max_infected:
+                self.max_infected = infected
+                self.peak_day = day
+
+            log_callback(f"--- День {day + 1} ---")
+            log_callback(
+                f"Здоровые: {healthy}, Подверженные: {exposed}, Заражённые: {infected}, Вылеченные: {cured}")
+
+            if (infected == 0 and exposed == 0) or healthy == 0:
+                log_callback("Симуляция завершена.")
+                break
+
+            new_infected = self.population.update()
+            log_callback(f"Новые заражённые: {new_infected}")
+
+        return self.history
 
 class MathematicalModel(BaseModel):
-    def run(self):
+    def run(self, log_callback):
         pass
 
 # Класс графического интерфейса
