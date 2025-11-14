@@ -391,6 +391,12 @@ class GUI():
             plot.legend()
             plot.grid(True, linestyle='--', alpha=0.5)
 
+            if hasattr(self.sim, 'peak_day') and hasattr(self.sim, 'max_infected'):
+                plot.scatter(self.sim.peak_day, self.sim.max_infected, color='red', s=100, zorder=5)
+                plot.text(self.sim.peak_day, self.sim.max_infected, f'день {self.sim.peak_day}', color='red',
+                          fontsize=10,
+                          ha='left', va='bottom')
+
         elif chart_type == 'Круговой':
             plot = fig.add_subplot(111)
             sizes = [
