@@ -393,16 +393,16 @@ class GUI():
 
         elif chart_type == 'Круговой':
             plot = fig.add_subplot(111)
-            labels = ['Здоровые', 'Подверженные', 'Заражённые', 'Вылеченные']
             sizes = [
-                history['healthy'][-1],
-                history['exposed'][-1],
-                history['infected'][-1],
-                history['cured'][-1]
+                sum(history['healthy']) / len(history['healthy']),
+                sum(history['exposed']) / len(history['exposed']),
+                sum(history['infected']) / len(history['infected']),
+                sum(history['cured']) / len(history['cured']),
             ]
+            labels = ['Здоровые', 'Подверженные', 'Заражённые', 'Вылеченные']
             plot.pie(sizes, labels=labels, autopct='%1.1f%%', startangle=90,
                      colors=['green', 'orange', 'red', 'blue'])
-            plot.set_title(f'Статистика на день {len(history["healthy"])}')
+            plot.set_title(f'Статистика симуляции')
 
         self.graph_canvas = FigureCanvasTkAgg(fig, master=self.right_frame)
         self.graph_canvas.draw()
