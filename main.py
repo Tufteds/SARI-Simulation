@@ -4,6 +4,8 @@ import tkinter as tk
 import random
 from tkinter import messagebox, scrolledtext, ttk
 from collections import defaultdict
+from abc import ABC, abstractmethod
+from PIL import Image, ImageTk
 
 # --- Сторонние библиотеки ---
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
@@ -37,7 +39,7 @@ class Virus():
         self.type = 'ОРВИ'
         self.time_incubation = 2
         self.base_duration = random.randint(5, 7)
-        self.infection_probability = 0.1
+        self.infection_probability = 0.2
 
 virus = Virus()
 
@@ -107,22 +109,25 @@ class Population():
     def get_statistics(self):
         return {status: len(group) for status, group in self.group_by_status().items()}
 
-# Класс симуляции
-class Simulation():
-    def __init__(self, population_size, days, log_callback):
-        self.population = Population(population_size, round(population_size*0.05))
+class BaseModel(ABC):
+    def __init__(self, population_size, days):
+        self.population_size = population_size
         self.days = days
+        self.history = {}
+
+    @abstractmethod
+    def run(self,log_callback):
+        pass
+
+class AgentBasedModel(BaseModel):
+    def __init__(self, population_size, days):
+        super().__init__(population_size, days)
+        self.population = Population(population_size, round(population_size * 0.05))
         self.history = {'healthy': [], 'exposed': [], 'infected': [], 'cured': []}
-        self.log_callback = log_callback
         self.peak_day = 0
         self.max_infected = 0
 
-    # Вывод логов
-    def log_message(self, message):
-        self.log_callback(message)
-
-    # Запуск симуляции
-    def run(self):
+    def run(self, log_callback):
         for day in range(self.days):
             groups = self.population.group_by_status()
             healthy = len(groups.get('healthy', []))
@@ -139,18 +144,68 @@ class Simulation():
                 self.max_infected = infected
                 self.peak_day = day
 
-            self.log_message(f"--- День {day + 1} ---")
-            self.log_message(
+            log_callback(f"--- День {day + 1} ---")
+            log_callback(
                 f"Здоровые: {healthy}, Подверженные: {exposed}, Заражённые: {infected}, Вылеченные: {cured}")
 
             if (infected == 0 and exposed == 0) or healthy == 0:
-                self.log_message("Симуляция завершена.")
+                log_callback("Симуляция завершена.")
                 break
 
             new_infected = self.population.update()
-            self.log_message(f"Новые заражённые: {new_infected}")
+            log_callback(f"Новые заражённые: {new_infected}")
 
         return self.history
+
+class MathematicalModel(BaseModel):
+    def __init__(self, population_size, days):
+        super().__init__(population_size, days)
+        self.population = Population(population_size, round(population_size * 0.05))
+        self.history = {'healthy': [], 'exposed': [], 'infected': [], 'cured': []}
+        self.peak_day = 0
+        self.max_infected = 0
+
+        # Параметры SEIR
+        self.beta = 0.3
+        self.sigma = 1/2
+        self.gamma = 1/6
+
+        # Начальные состояния
+        initial_infected = round(population_size * 0.05)
+        self.S = population_size - initial_infected
+        self.E = initial_infected
+        self.I = 0
+        self.R = 0
+
+        self.history = {'healthy': [], 'exposed': [], 'infected': [], 'cured': []}
+
+    def run(self, log_callback):
+        for day in range(self.days):
+            new_exposed = self.beta * self.S * self.I / self.population_size
+            new_infected = self.sigma * self.E
+            new_recovered = self.gamma * self.I
+
+            self.S -= new_exposed
+            self.E += new_exposed - new_infected
+            self.I += new_infected - new_recovered
+            self.R += new_recovered
+
+            self.history['healthy'].append(int(self.S))
+            self.history['exposed'].append(int(self.E))
+            self.history['infected'].append(int(self.I))
+            self.history['cured'].append(int(self.R))
+
+            # Лог
+            log_callback(f"--- День {day+1} ---")
+            log_callback(
+                f"Здоровые: {int(self.S)}, Подверженные: {int(self.E)}, Заражённые: {int(self.I)}, Вылеченные: {int(self.R)}"
+            )
+
+        return self.history
+
+class HybrydModel(BaseModel):
+    def run(self, log_callback):
+        pass
 
 # Класс графического интерфейса
 class GUI():
@@ -160,68 +215,122 @@ class GUI():
         self.graph_canvas = None
         self.build_ui()
 
-    # Построение окна tkninter
+    def open_advanced_settings(self):
+        top = tk.Toplevel(self.root)
+        top.title("Расширенные настройки")
+        top.geometry("400x300")
+        tk.Label(top, text="Здесь будут расширенные настройки", font=self.font).pack(pady=20)
+        tk.Button(top, text="Закрыть", command=top.destroy).pack(pady=20)
+
     def build_ui(self):
         self.main_frame = tk.Frame(self.root)
         self.main_frame.pack(fill='both', expand=True)
 
+        # Левый фрейм для управления
         self.left_frame = tk.Frame(self.main_frame)
         self.left_frame.pack(side='left', fill='both', expand=True, padx=10, pady=10)
 
+        # Правый фрейм для графика
         self.right_frame = tk.Frame(self.main_frame)
         self.right_frame.pack(side='right', fill='both', expand=True, padx=10, pady=10)
 
-        # Шрифт для всех элементов ввода
-        self.font = ('Segoe UI', 13)
+        # ---------- Заголовок ----------
+        tk.Label(
+            self.left_frame,
+            text="Основные параметры",
+            font=('Segoe UI', 16, 'bold'),
+            fg='black'
+        ).grid(row=0, column=0, columnspan=4, pady=(0, 10))
 
-        # Поле ввода размера популяции
-        tk.Label(self.left_frame, text="Размер популяции:", font=self.font).pack(pady=5)
+        # ---------- Матрица ввода ----------
+        # Размер популяции
+        tk.Label(self.left_frame, text="Размер популяции:", font=self.font).grid(row=1, column=0, sticky='w', padx=5,
+                                                                                 pady=5)
         self.population_entry = tk.Entry(self.left_frame, font=self.font, width=20)
-        self.population_entry.pack(pady=5)
+        self.population_entry.grid(row=1, column=1, padx=5, pady=5, sticky='w')
 
-        # Поле ввода количества дней
-        tk.Label(self.left_frame, text="Количество дней симуляции:", font=self.font).pack(pady=5)
-        self.days_entry = tk.Entry(self.left_frame, font=self.font, width=20)
-        self.days_entry.pack(pady=5)
-
-        # Выпадающий список выбора типа модели
-        tk.Label(self.left_frame, text="Тип модели:", font=self.font).pack(pady=5)
+        # Тип модели
+        tk.Label(self.left_frame, text="Тип модели:", font=self.font).grid(row=1, column=2, sticky='w', padx=5, pady=5)
         self.model_var = tk.StringVar()
         self.model_combobox = ttk.Combobox(
             self.left_frame,
             textvariable=self.model_var,
-            state='readonly',  # запрет ручного ввода
-            values=['Выберите тип модели', 'Агентная', 'Математическая', 'Гибридная'],
-            width=20,  # ширина как у Entry
-            font=self.font,
-            height=5  # сколько элементов видно при раскрытии
+            state='readonly',
+            values=['Выберите тип модели', 'Агентная', 'Математическая'],
+            width=20,
+            font=self.font
         )
-        self.model_combobox.current(0)  # первый элемент по умолчанию
-        self.model_combobox.pack(pady=5)
+        self.model_combobox.current(0)
+        self.model_combobox.grid(row=1, column=3, padx=(0, 5), pady=5, sticky='w')
 
-        def remove_placeholder(event):
-            current = self.model_var.get()
-            if current != "Выберите тип модели":
-                # Обновляем список без плейсхолдера
-                self.model_combobox['values'] = ['Агентная', 'Математическая', 'Гибридная']
+        # Количество дней
+        tk.Label(self.left_frame, text="Количество дней:", font=self.font).grid(row=2, column=0, sticky='w', padx=5,
+                                                                                pady=5)
+        self.days_entry = tk.Entry(self.left_frame, font=self.font, width=20)
+        self.days_entry.grid(row=2, column=1, padx=5, pady=5, sticky='w')
 
-        self.model_combobox.bind("<<ComboboxSelected>>", remove_placeholder)
+        # Тип графика
+        tk.Label(self.left_frame, text="Тип графика:", font=self.font).grid(row=2, column=2, sticky='w', padx=5, pady=5)
+        self.chart_type_var = tk.StringVar()
+        self.chart_type_combobox = ttk.Combobox(
+            self.left_frame,
+            textvariable=self.chart_type_var,
+            state='readonly',
+            values=['Линейный', 'Круговой'],
+            width=20,
+            font=self.font
+        )
+        self.chart_type_combobox.current(0)
+        self.chart_type_combobox.grid(row=2, column=3, padx=(0, 5), pady=5, sticky='w')
 
-        # Кнопка запуска
+        # ---------- Кнопки ----------
         tk.Button(
             self.left_frame,
             text="🚀 Запустить симуляцию",
             font=self.font,
             command=self.start_simulation
-        ).pack(pady=10)
+        ).grid(row=3, column=1, pady=10, padx=(0, 10))
 
-        # Лог
+        tk.Button(
+            self.left_frame,
+            text="⚙ Расширенные настройки",
+            font=self.font,
+            command=self.open_advanced_settings
+        ).grid(row=3, column=2, pady=10, padx=(10, 0))
+
+        # ---------- Лог ----------
         self.log_output = scrolledtext.ScrolledText(
             self.left_frame, height=20, font=('Consolas', 11)
         )
-        self.log_output.pack(pady=10, fill='both', expand=True)
+        self.log_output.grid(row=4, column=0, columnspan=4, pady=10, sticky='nsew')
 
-    # Старт симуляции (по кнопке)
+        # Растяжение левого фрейма
+        self.left_frame.grid_rowconfigure(4, weight=1)
+        self.left_frame.grid_columnconfigure((0, 1, 2, 3), weight=1)
+
+        # ---------- Заглушка графика ----------
+        self.graph_placeholder = tk.Frame(
+            self.right_frame,
+            width=625,
+            height=600,
+            bg='white',
+            relief='ridge',
+            bd=2
+        )
+        self.graph_placeholder.pack(padx=10, pady=10)
+        self.graph_placeholder.pack_propagate(False)
+
+        # Текст по центру заглушки
+        label = tk.Label(
+            self.graph_placeholder,
+            text="Место для графика",
+            font=('Segoe UI', 16),
+            fg='gray',
+            bg='white'
+        )
+        label.place(relx=0.5, rely=0.5, anchor='center')
+
+    # ---------- Старт симуляции ----------
     def start_simulation(self):
         try:
             population_size = int(self.population_entry.get().replace('.', ''))
@@ -238,39 +347,62 @@ class GUI():
 
         self.log_output.delete(1.0, tk.END)
 
-        self.sim = Simulation(population_size, days, self.log_message)
-        self.sim.run()
+        # Выбор модели
+        if selected_model == 'Агентная':
+            self.sim = AgentBasedModel(population_size, days)
+        elif selected_model == 'Математическая':
+            self.sim = MathematicalModel(population_size, days)
+        else:
+            messagebox.showerror("Ошибка", "Выбранный тип модели не поддерживается!")
+            return
+
+        # Запуск модели
+        self.sim.run(self.log_message)
+
+        # Отрисовка графика
         self.draw_graph(self.sim.history)
 
-    # Вывод в GUI
+    # ---------- Вывод в лог ----------
     def log_message(self, msg):
         self.log_output.insert(tk.END, msg + '\n')
         self.log_output.see(tk.END)
 
-    # Отрисовка графика
+    # ---------- Отрисовка графика ----------
     def draw_graph(self, history):
+        if hasattr(self, 'graph_placeholder') and self.graph_placeholder:
+            self.graph_placeholder.pack_forget()
+            self.graph_placeholder = None
+
         if self.graph_canvas:
             self.graph_canvas.get_tk_widget().destroy()
 
+        chart_type = self.chart_type_var.get()
         fig = Figure(figsize=(6, 4), dpi=100)
-        plot = fig.add_subplot(111)
-        plot.plot(history['healthy'], label='Здоровые', color='green')
-        plot.plot(history['exposed'], label='Подверженные', color='orange')
-        plot.plot(history['infected'], label='Заражённые', color='red')
-        plot.plot(history['cured'], label='Вылеченные', color='blue')
-        plot.legend()
-        plot.grid(True, linestyle='--', alpha=0.5)
 
-        plot.plot(self.sim.peak_day, self.sim.max_infected, 'ro')  # 'ro' — красная точка
-        plot.text(self.sim.peak_day, self.sim.max_infected, f'Пик болезни\nДень {self.sim.peak_day + 1}',
-                  fontsize=10, color='black', ha='center', va='bottom')
+        if chart_type == 'Линейный':
+            plot = fig.add_subplot(111)
+            plot.plot(history['healthy'], label='Здоровые', color='green')
+            plot.plot(history['exposed'], label='Подверженные', color='orange')
+            plot.plot(history['infected'], label='Заражённые', color='red')
+            plot.plot(history['cured'], label='Вылеченные', color='blue')
+            plot.set_xlabel('Дни')
+            plot.set_ylabel('Люди')
+            plot.set_title('ОРВИ Симуляция')
+            plot.legend()
+            plot.grid(True, linestyle='--', alpha=0.5)
 
-        plot.set_xlabel('Дни', color='black')
-        plot.set_ylabel('Люди', color='black')
-        plot.set_title('ОРВИ Симуляция', color='black')
-        plot.tick_params(colors='black')
-        plot.grid(True, linestyle='--', alpha=0.5)
-        plot.legend()
+        elif chart_type == 'Круговой':
+            plot = fig.add_subplot(111)
+            sizes = [
+                sum(history['healthy']) / len(history['healthy']),
+                sum(history['exposed']) / len(history['exposed']),
+                sum(history['infected']) / len(history['infected']),
+                sum(history['cured']) / len(history['cured']),
+            ]
+            labels = ['Здоровые', 'Подверженные', 'Заражённые', 'Вылеченные']
+            plot.pie(sizes, labels=labels, autopct='%1.1f%%', startangle=90,
+                     colors=['green', 'orange', 'red', 'blue'])
+            plot.set_title(f'Статистика симуляции')
 
         self.graph_canvas = FigureCanvasTkAgg(fig, master=self.right_frame)
         self.graph_canvas.draw()
