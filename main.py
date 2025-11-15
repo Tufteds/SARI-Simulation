@@ -38,8 +38,8 @@ class Virus():
     def __init__(self):
         self.type = 'ОРВИ'
         self.time_incubation = 2
-        self.base_duration = random.randint(5, 7)
-        self.infection_probability = 0.2
+        self.base_duration = 6
+        self.infection_probability = 0.12
 
 virus = Virus()
 
@@ -51,6 +51,7 @@ class Person():
         self.incubation = 0
         self.immunity = immunity
         self.immunity_effects = {'low': 1, 'medium': 0, 'strong': -1}
+        self._cured_time = 0
 
     # Обновление статуса
     def update_infections(self):
@@ -62,6 +63,12 @@ class Person():
             self.days_infected += 1
             if self.days_infected >= virus.base_duration + self.immunity_effects[self.immunity]:
                 self.status = 'cured'
+        elif self.status == 'cured':
+            self._cured_time -= 1
+            if self._cured_time <= 0:
+                self.status = 'healthy'
+                self.days_infected = 0
+                self.incubation = 0
 
     # Функиця на будущее
     def get_contact(self):
@@ -166,9 +173,11 @@ class MathematicalModel(BaseModel):
         self.max_infected = 0
 
         # Параметры SEIR
-        self.beta = 0.3
-        self.sigma = 1/2
-        self.gamma = 1/6
+        self.beta = 0.3     # вероятность заражения
+        self.sigma = 1/2    # переход E -> I (инкубация)
+        self.gamma = 1/6    # выздоровление I -> R
+        self.T_immunity = 10 # дни иммунитета
+        self.delta = 1 / self.T_immunity  # скорость потери иммунитета R -> S
 
         # Начальные состояния
         initial_infected = round(population_size * 0.05)
@@ -177,44 +186,45 @@ class MathematicalModel(BaseModel):
         self.I = 0
         self.R = 0
 
-        self.history = {'healthy': [], 'exposed': [], 'infected': [], 'cured': []}
-
     def run(self, log_callback):
         for day in range(self.days):
+            # SEIR с возвращением в S
             new_exposed = self.beta * self.S * self.I / self.population_size
             new_infected = self.sigma * self.E
             new_recovered = self.gamma * self.I
+            back_to_susceptible = self.delta * self.R  # R -> S
 
-            if self.I < 0.5 and self.E < 0.5:
-                log_callback(f"Эпидемия завершилась на дне {day}.")
-                break
-
-            self.S -= new_exposed
+            # Обновляем состояния
+            self.S += back_to_susceptible - new_exposed
             self.E += new_exposed - new_infected
             self.I += new_infected - new_recovered
-            self.R += new_recovered
+            self.R += new_recovered - back_to_susceptible
 
-            current_S = max(0, int(self.S))
-            current_E = max(0, int(self.E))
-            current_I = max(0, int(self.I))
-            current_R = max(0, int(self.R))
+            # Неотрицательные значения
+            self.S = max(self.S, 0)
+            self.E = max(self.E, 0)
+            self.I = max(self.I, 0)
+            self.R = max(self.R, 0)
 
-            self.history['healthy'].append(current_S)
-            self.history['exposed'].append(current_E)
-            self.history['infected'].append(current_I)
-            self.history['cured'].append(current_R)
+            # Сохраняем для истории
+            self.history['healthy'].append(int(self.S))
+            self.history['exposed'].append(int(self.E))
+            self.history['infected'].append(int(self.I))
+            self.history['cured'].append(int(self.R))
 
-            if current_I > self.max_infected:
-                self.max_infected = current_I
+            # Пик заражённых
+            if self.I > self.max_infected:
+                self.max_infected = int(self.I)
                 self.peak_day = day
 
-            # Лог
             log_callback(f"--- День {day+1} ---")
             log_callback(
-                f"Здоровые: {int(self.S)}, Подверженные: {int(self.E)}, Заражённые: {int(self.I)}, Вылеченные: {int(self.R)}"
+                f"Здоровые: {int(self.S)}, Подверженные: {int(self.E)}, "
+                f"Заражённые: {int(self.I)}, Вылеченные: {int(self.R)}"
             )
 
         return self.history
+
 
 class HybrydModel(BaseModel):
     def run(self, log_callback):
