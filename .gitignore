@@ -14,3 +14,4 @@ Thumbs.db
 *.png
 *.spec
 versions/
+script.py
