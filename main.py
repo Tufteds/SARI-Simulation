@@ -53,16 +53,18 @@ class Person():
         self.immunity_effects = {'low': 1, 'medium': 0, 'strong': -1}
         self._cured_time = 0
 
-    # Обновление статуса
     def update_infections(self):
         if self.status == 'exposed':
             self.incubation += 1
-            if self.incubation >= virus.time_incubation:
+            # Случайный разброс инкубационного периода
+            if self.incubation >= virus.time_incubation + random.choice([-1, 0, 1]):
                 self.status = 'infected'
         elif self.status == 'infected':
             self.days_infected += 1
-            if self.days_infected >= virus.base_duration + self.immunity_effects[self.immunity]:
+            # Случайный разброс длительности болезни
+            if self.days_infected >= virus.base_duration + self.immunity_effects[self.immunity] + random.randint(-1,1):
                 self.status = 'cured'
+                self._cured_time = 10  # дни иммунитета
         elif self.status == 'cured':
             self._cured_time -= 1
             if self._cured_time <= 0:
@@ -70,9 +72,30 @@ class Person():
                 self.days_infected = 0
                 self.incubation = 0
 
-    # Функиця на будущее
-    def get_contact(self):
-        pass
+# --- Изменения в Population.update() ---
+def update(self):
+    groups = self.group_by_status()
+    new_infections = 0
+
+    for person in self.people:
+        person.update_infections()
+
+    infected_group = groups['infected']
+    healthy_group = groups['healthy']
+
+    if infected_group and healthy_group:
+        random.shuffle(healthy_group)
+        for infected_person in infected_group:
+            contacts_per_infected = random.randint(1, 4)  # случайное количество контактов
+            for _ in range(contacts_per_infected):
+                if not healthy_group:
+                    break
+                target = healthy_group.pop()
+                if random.random() < virus.infection_probability:
+                    target.status = 'exposed'
+                    target.incubation = 0
+                    new_infections += 1
+    return new_infections
 
 # Класс популяции людей
 class Population():
@@ -167,54 +190,49 @@ class AgentBasedModel(BaseModel):
 class MathematicalModel(BaseModel):
     def __init__(self, population_size, days):
         super().__init__(population_size, days)
-        self.population = Population(population_size, round(population_size * 0.05))
         self.history = {'healthy': [], 'exposed': [], 'infected': [], 'cured': []}
         self.peak_day = 0
         self.max_infected = 0
 
-        # Параметры SEIR
-        self.beta = 0.3     # вероятность заражения
-        self.sigma = 1/2    # переход E -> I (инкубация)
-        self.gamma = 1/6    # выздоровление I -> R
-        self.T_immunity = 10 # дни иммунитета
-        self.delta = 1 / self.T_immunity  # скорость потери иммунитета R -> S
-
-        # Начальные состояния
-        initial_infected = round(population_size * 0.05)
-        self.S = population_size - initial_infected
-        self.E = initial_infected
+        # SEIR параметры
+        self.N = population_size
+        self.initial_infected = round(population_size * 0.05)
+        self.S = population_size - self.initial_infected
+        self.E = self.initial_infected
         self.I = 0
         self.R = 0
 
+        self.beta = 0.3          # базовая вероятность заражения
+        self.sigma = 1/2         # скорость перехода E->I
+        self.gamma = 1/6         # скорость выздоровления I->R
+        self.T_immunity = 10
+        self.delta = 1/self.T_immunity  # скорость потери иммунитета R->S
+
     def run(self, log_callback):
         for day in range(self.days):
-            # SEIR с возвращением в S
-            new_exposed = self.beta * self.S * self.I / self.population_size
-            new_infected = self.sigma * self.E
-            new_recovered = self.gamma * self.I
-            back_to_susceptible = self.delta * self.R  # R -> S
+            # --- Динамический beta (например, снижение контактов при высокой заболеваемости) ---
+            effective_beta = self.beta * max(0.2, 1 - self.I/self.N)  # уменьшаем при высоких I
 
-            # Обновляем состояния
-            self.S += back_to_susceptible - new_exposed
-            self.E += new_exposed - new_infected
-            self.I += new_infected - new_recovered
-            self.R += new_recovered - back_to_susceptible
+            # --- Стохастические переходы ---
+            new_exposed = min(self.S, sum([1 for _ in range(int(self.S)) if random.random() < effective_beta*self.I/self.N]))
+            new_infected = min(self.E, sum([1 for _ in range(int(self.E)) if random.random() < self.sigma]))
+            new_recovered = min(self.I, sum([1 for _ in range(int(self.I)) if random.random() < self.gamma]))
+            back_to_susceptible = min(self.R, sum([1 for _ in range(int(self.R)) if random.random() < self.delta]))
 
-            # Неотрицательные значения
-            self.S = max(self.S, 0)
-            self.E = max(self.E, 0)
-            self.I = max(self.I, 0)
-            self.R = max(self.R, 0)
+            # --- Обновление состояний ---
+            self.S = self.S + back_to_susceptible - new_exposed
+            self.E = self.E + new_exposed - new_infected
+            self.I = self.I + new_infected - new_recovered
+            self.R = self.R + new_recovered - back_to_susceptible
 
-            # Сохраняем для истории
-            self.history['healthy'].append(int(self.S))
-            self.history['exposed'].append(int(self.E))
-            self.history['infected'].append(int(self.I))
-            self.history['cured'].append(int(self.R))
+            # --- Запись в историю ---
+            self.history['healthy'].append(self.S)
+            self.history['exposed'].append(self.E)
+            self.history['infected'].append(self.I)
+            self.history['cured'].append(self.R)
 
-            # Пик заражённых
             if self.I > self.max_infected:
-                self.max_infected = int(self.I)
+                self.max_infected = self.I
                 self.peak_day = day
 
             log_callback(f"--- День {day+1} ---")
@@ -222,6 +240,11 @@ class MathematicalModel(BaseModel):
                 f"Здоровые: {int(self.S)}, Подверженные: {int(self.E)}, "
                 f"Заражённые: {int(self.I)}, Вылеченные: {int(self.R)}"
             )
+
+            # Завершение, если эпидемия угасла
+            if self.I == 0 and self.E == 0:
+                log_callback("Эпидемия закончилась.")
+                break
 
         return self.history
 
