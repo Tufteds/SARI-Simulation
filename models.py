@@ -1,8 +1,9 @@
 import random
 from collections import defaultdict
 from abc import ABC, abstractmethod
+from utils import singleton
 
-# -------------------- Вирус --------------------
+@singleton
 class Virus:
     _instance = None
     def __new__(cls):
@@ -16,7 +17,6 @@ class Virus:
 
 virus = Virus()
 
-# -------------------- Человек --------------------
 class Person:
     def __init__(self, immunity):
         self.status = 'healthy'
@@ -42,7 +42,6 @@ class Person:
                 self.days_infected = 0
                 self.incubation = 0
 
-# -------------------- Популяция --------------------
 class Population:
     def __init__(self, size, infected_count):
         self.people = [Person(random.choice(['low', 'medium', 'strong'])) for _ in range(size)]
@@ -81,7 +80,6 @@ class Population:
     def get_statistics(self):
         return {status: len(group) for status, group in self.group_by_status().items()}
 
-# -------------------- Базовая модель --------------------
 class BaseModel(ABC):
     def __init__(self, population_size, days):
         self.population_size = population_size
@@ -92,7 +90,6 @@ class BaseModel(ABC):
     def run(self, log_callback):
         pass
 
-# -------------------- Агентная модель --------------------
 class AgentBasedModel(BaseModel):
     def __init__(self, population_size, days):
         super().__init__(population_size, days)
@@ -132,7 +129,6 @@ class AgentBasedModel(BaseModel):
 
         return self.history
 
-# -------------------- Математическая модель --------------------
 class MathematicalModel(BaseModel):
     def __init__(self, population_size, days):
         super().__init__(population_size, days)
@@ -187,7 +183,6 @@ class MathematicalModel(BaseModel):
 
         return self.history
 
-# -------------------- Гибридная модель --------------------
 class HybrydModel(BaseModel):
     def run(self, log_callback):
         log_callback("Гибридная модель пока не реализована.")

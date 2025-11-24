@@ -1,10 +1,9 @@
-from tkinter import Tk, Toplevel, Frame, Label, Entry, Button, StringVar, scrolledtext, ttk, messagebox
 import tkinter as tk
+from tkinter import scrolledtext, ttk, messagebox
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
 from matplotlib.animation import FuncAnimation
 from models import AgentBasedModel, MathematicalModel, HybrydModel
-import os
 
 class GUI():
     def __init__(self, root):
