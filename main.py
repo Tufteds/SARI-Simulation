@@ -73,29 +73,6 @@ class Person():
                 self.incubation = 0
 
 # --- Изменения в Population.update() ---
-def update(self):
-    groups = self.group_by_status()
-    new_infections = 0
-
-    for person in self.people:
-        person.update_infections()
-
-    infected_group = groups['infected']
-    healthy_group = groups['healthy']
-
-    if infected_group and healthy_group:
-        random.shuffle(healthy_group)
-        for infected_person in infected_group:
-            contacts_per_infected = random.randint(1, 4)  # случайное количество контактов
-            for _ in range(contacts_per_infected):
-                if not healthy_group:
-                    break
-                target = healthy_group.pop()
-                if random.random() < virus.infection_probability:
-                    target.status = 'exposed'
-                    target.incubation = 0
-                    new_infections += 1
-    return new_infections
 
 # Класс популяции людей
 class Population():
@@ -118,7 +95,8 @@ class Population():
         if infected_group and healthy_group:
             random.shuffle(healthy_group)
             for infected_person in infected_group:
-                for _ in range(2):
+                contacts_per_infected = random.randint(1, 4)  # случайное количество контактов
+                for _ in range(contacts_per_infected):
                     if not healthy_group:
                         break
                     target = healthy_group.pop()
