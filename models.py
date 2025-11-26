@@ -1,8 +1,10 @@
+# Начальные модули
 import random
 from collections import defaultdict
 from abc import ABC, abstractmethod
 from utils import singleton
 
+# Вирус в единственном экземпляре
 @singleton
 class Virus:
     _instance = None
@@ -17,6 +19,7 @@ class Virus:
 
 virus = Virus()
 
+# Человек
 class Person:
     def __init__(self, immunity):
         self.status = 'healthy'
@@ -26,6 +29,7 @@ class Person:
         self.immunity_effects = {'low': 1, 'medium': 0, 'strong': -1}
         self._cured_time = 0
 
+    # Логика обновления статуса
     def update_infections(self):
         if self.status == 'exposed':
             self.incubation += 1
@@ -42,12 +46,15 @@ class Person:
                 self.days_infected = 0
                 self.incubation = 0
 
+# Популяция
 class Population:
     def __init__(self, size, infected_count):
         self.people = [Person(random.choice(['low', 'medium', 'strong'])) for _ in range(size)]
+        # Наделение начальных людей зараженными
         for person in random.sample(self.people, infected_count):
             person.status = 'exposed'
 
+    # Механизм заражения
     def update(self):
         groups = self.group_by_status()
         new_infections = 0
@@ -65,21 +72,25 @@ class Population:
                     if not healthy_group:
                         break
                     target = healthy_group.pop()
+                    # Сравнение случайного шанса с заболеваемостью вируса
                     if random.random() < virus.infection_probability:
                         target.status = 'exposed'
                         target.incubation = 0
                         new_infections += 1
         return new_infections
 
+    # Группировка по статусу
     def group_by_status(self):
         groups = defaultdict(list)
         for person in self.people:
             groups[person.status].append(person)
         return groups
 
+    # Получение статистики
     def get_statistics(self):
         return {status: len(group) for status, group in self.group_by_status().items()}
 
+# Абстрактный класс моделей
 class BaseModel(ABC):
     def __init__(self, population_size, days):
         self.population_size = population_size
@@ -90,6 +101,7 @@ class BaseModel(ABC):
     def run(self, log_callback):
         pass
 
+# Агентная модель
 class AgentBasedModel(BaseModel):
     def __init__(self, population_size, days):
         super().__init__(population_size, days)
@@ -98,6 +110,7 @@ class AgentBasedModel(BaseModel):
         self.peak_day = 0
         self.max_infected = 0
 
+    # Запуск относительно агентной модели
     def run(self, log_callback):
         for day in range(self.days):
             groups = self.population.group_by_status()
@@ -129,6 +142,7 @@ class AgentBasedModel(BaseModel):
 
         return self.history
 
+# Математическая модель
 class MathematicalModel(BaseModel):
     def __init__(self, population_size, days):
         super().__init__(population_size, days)
@@ -149,6 +163,7 @@ class MathematicalModel(BaseModel):
         self.I = 0
         self.R = 0
 
+    # Запуск относительно математической модели
     def run(self, log_callback):
         for day in range(self.days):
             new_exposed = self.beta * self.S * self.I / self.population_size
@@ -183,6 +198,7 @@ class MathematicalModel(BaseModel):
 
         return self.history
 
+# Гибридная модель
 class HybrydModel(BaseModel):
     def run(self, log_callback):
         log_callback("Гибридная модель пока не реализована.")

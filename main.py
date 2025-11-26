@@ -1,7 +1,9 @@
+# Начальные модули
 import tkinter as tk
 from gui import GUI
 from utils import Utils
 
+# Запуск программы
 if __name__ == "__main__":
     root = tk.Tk()
     root.title("Симуляция распространения ОРВИ")

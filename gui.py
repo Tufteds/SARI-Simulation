@@ -1,3 +1,4 @@
+# Начальные модули
 import tkinter as tk
 from tkinter import scrolledtext, ttk, messagebox
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
@@ -5,6 +6,7 @@ from matplotlib.figure import Figure
 from matplotlib.animation import FuncAnimation
 from models import AgentBasedModel, MathematicalModel, HybrydModel
 
+# Графический интерфейс
 class GUI():
     def __init__(self, root):
         self.root = root
@@ -12,6 +14,7 @@ class GUI():
         self.graph_canvas = None
         self.build_ui()
 
+    # Расширенные настройки
     def open_advanced_settings(self):
         top = tk.Toplevel(self.root)
         top.title("Расширенные настройки")
@@ -19,6 +22,7 @@ class GUI():
         tk.Label(top, text="Здесь будут расширенные настройки", font=self.font).pack(pady=20)
         tk.Button(top, text="Закрыть", command=top.destroy).pack(pady=20)
 
+    # Построение окна
     def build_ui(self):
         self.main_frame = tk.Frame(self.root)
         self.main_frame.pack(fill='both', expand=True)
@@ -31,7 +35,7 @@ class GUI():
         self.right_frame = tk.Frame(self.main_frame)
         self.right_frame.pack(side='right', fill='both', expand=True, padx=10, pady=10)
 
-        # ---------- Заголовок ----------
+        # Заголовок
         tk.Label(
             self.left_frame,
             text="Основные параметры",
@@ -39,7 +43,7 @@ class GUI():
             fg='black'
         ).grid(row=0, column=0, columnspan=4, pady=(0, 10))
 
-        # ---------- Матрица ввода ----------
+        # Матрица ввода
         # Размер популяции
         tk.Label(self.left_frame, text="Размер популяции:", font=self.font).grid(row=1, column=0, sticky='w', padx=5,
                                                                                  pady=5)
@@ -80,7 +84,7 @@ class GUI():
         self.chart_type_combobox.current(0)
         self.chart_type_combobox.grid(row=2, column=3, padx=(0, 5), pady=5, sticky='w')
 
-        # ---------- Кнопки ----------
+        # Кнопки
         tk.Button(
             self.left_frame,
             text="🚀 Запустить симуляцию",
@@ -95,7 +99,7 @@ class GUI():
             command=self.open_advanced_settings
         ).grid(row=3, column=2, pady=10, padx=(10, 0))
 
-        # ---------- Лог ----------
+        # Лог
         self.log_output = scrolledtext.ScrolledText(
             self.left_frame, height=20, font=('Consolas', 11)
         )
@@ -105,7 +109,7 @@ class GUI():
         self.left_frame.grid_rowconfigure(4, weight=1)
         self.left_frame.grid_columnconfigure((0, 1, 2, 3), weight=1)
 
-        # ---------- Заглушка графика ----------
+        # Заглушка для графика
         self.graph_placeholder = tk.Frame(
             self.right_frame,
             width=625,
@@ -117,7 +121,7 @@ class GUI():
         self.graph_placeholder.pack(padx=10, pady=10)
         self.graph_placeholder.pack_propagate(False)
 
-        # Текст по центру заглушки
+        # Текст в заглушке
         label = tk.Label(
             self.graph_placeholder,
             text="Место для графика",
@@ -127,7 +131,7 @@ class GUI():
         )
         label.place(relx=0.5, rely=0.5, anchor='center')
 
-    # ---------- Старт симуляции ----------
+    # Старт симуляции
     def start_simulation(self):
         try:
             population_size = int(self.population_entry.get().replace('.', ''))
@@ -159,12 +163,12 @@ class GUI():
         # Отрисовка графика
         self.draw_graph(self.sim.history)
 
-    # ---------- Вывод в лог ----------
+    # Вывод в лог
     def log_message(self, msg):
         self.log_output.insert(tk.END, msg + '\n')
         self.log_output.see(tk.END)
 
-    # ---------- Отрисовка графика ----------
+    # Отрисовка графика
     def draw_graph(self, history):
         if hasattr(self, 'graph_placeholder') and self.graph_placeholder:
             self.graph_placeholder.pack_forget()
@@ -189,8 +193,8 @@ class GUI():
         infected = history['infected']
         cured = history['cured']
 
-        # ===== АНИМИРОВАННЫЙ ЛИНЕЙНЫЙ ГРАФИК =====
-        if chart_type == "Линейный":  # теперь анимация
+        # Линейный график с анимацией
+        if chart_type == "Линейный":
             plot.set_xlim(0, len(days))
             plot.set_ylim(0, max(healthy + exposed + infected + cured))
 
@@ -205,14 +209,13 @@ class GUI():
             plot.legend()
             plot.grid(True, linestyle='--', alpha=0.5)
 
-            # Функция обновления кадров
+            # Обновление кадров
             def update(frame):
                 line_h.set_data(days[:frame], healthy[:frame])
                 line_e.set_data(days[:frame], exposed[:frame])
                 line_i.set_data(days[:frame], infected[:frame])
                 line_c.set_data(days[:frame], cured[:frame])
 
-                # ВАЖНО! Обновляем TK-контейнер
                 self.graph_canvas.draw()
 
                 return line_h, line_e, line_i, line_c
@@ -223,9 +226,9 @@ class GUI():
                                            interval=40,
                                            repeat=False)
 
-            return  # выходим чтобы не рисовать ничего больше
+            return
 
-        # ===== если выбрана Круговая =====
+        # Круговая диаграмма
         elif chart_type == "Круговой":
             sizes = [
                 sum(history['healthy']) / len(history['healthy']),
@@ -238,7 +241,7 @@ class GUI():
                      colors=['green', 'orange', 'red', 'blue'])
             plot.set_title(f'Статистика симуляции')
 
-        # ===== если выбрана Столбчатая =====
+        # Столбчатая диаграмма
         elif chart_type == "Столбчатый":
             days_idx = list(range(1, len(healthy) + 1))
 
@@ -257,5 +260,4 @@ class GUI():
             plot.set_title("Столбчатая диаграмма")
             plot.grid(axis='y', linestyle='--', alpha=0.5)
 
-        # Рисуем итог
         self.graph_canvas.draw()
