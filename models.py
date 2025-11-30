@@ -21,12 +21,12 @@ virus = Virus()
 
 # Человек
 class Person:
-    def __init__(self, immunity):
+    def __init__(self):
         self.status = 'healthy'
         self.days_infected = 0
         self.incubation = 0
-        self.immunity = immunity
-        self.immunity_effects = {'low': 1, 'medium': 0, 'strong': -1}
+        self.susceptibility = random.uniform(0.6, 1.0)
+        self.immunity_level = 0
         self._cured_time = 0
 
     # Логика обновления статуса
@@ -37,10 +37,12 @@ class Person:
                 self.status = 'infected'
         elif self.status == 'infected':
             self.days_infected += 1
-            if self.days_infected >= virus.base_duration + self.immunity_effects[self.immunity]:
+            if self.days_infected >= virus.base_duration:
                 self.status = 'cured'
         elif self.status == 'cured':
             self._cured_time -= 1
+            if self.immunity_level > 0:
+                self.immunity_level -= 0.01
             if self._cured_time <= 0:
                 self.status = 'healthy'
                 self.days_infected = 0
@@ -49,7 +51,7 @@ class Person:
 # Популяция
 class Population:
     def __init__(self, size, infected_count):
-        self.people = [Person(random.choice(['low', 'medium', 'strong'])) for _ in range(size)]
+        self.people = [Person() for _ in range(size)]
         # Наделение начальных людей зараженными
         for person in random.sample(self.people, infected_count):
             person.status = 'exposed'
@@ -72,8 +74,10 @@ class Population:
                     if not healthy_group:
                         break
                     target = healthy_group.pop()
+                    chance = virus.infection_probability * target.susceptibility * (1 - target.immunity_level)
+                    chance *= random.uniform(0.9, 1.1)
                     # Сравнение случайного шанса с заболеваемостью вируса
-                    if random.random() < virus.infection_probability:
+                    if random.random() < chance:
                         target.status = 'exposed'
                         target.incubation = 0
                         new_infections += 1
