@@ -7,12 +7,12 @@ from dataclasses import dataclass
 
 @dataclass
 class Immunity:
-    innate_strength: float = 1.0
-    adaptive_delay: int = 3
-    antibody_level: float = 0.0
-    memory_strength: float = 0.0
-    memory_decay_rate: float = 0.01
-    immunocompromised: bool = False
+    innate_strength: float = 0.5        # врожденная устойчивость (0–1)
+    adaptive_delay: int = 3             # дней до появления антител
+    antibody_level: float = 0.0         # текущий уровень антител (0–1)
+    memory_strength: float = 0.0        # иммунная память (0–1)
+    memory_decay_rate: float = 0.01     # спад памяти
+    immunocompromised: bool = False     # слабый иммунитет?
 
 # Вирус в единственном экземпляре
 @singleton
@@ -29,44 +29,55 @@ class Virus:
 
 virus = Virus()
 
-# Человек
 class Person:
     def __init__(self):
         self.status = 'healthy'
         self.days_infected = 0
         self.incubation = 0
-        self.susceptibility = random.uniform(0.6, 1.0)
-        self.immunity_level = 0
+        self.immunity = Immunity()
         self._cured_time = 0
 
-    # Логика обновления статуса
+    # Логика обновления состояния и иммунитета
     def update_infections(self):
+        self.immunity.antibody_level = max(0, self.immunity.antibody_level * 0.99)
+        self.immunity.memory_strength = max(0, self.immunity.memory_strength * (1 - self.immunity.memory_decay_rate))
+
         if self.status == 'exposed':
             self.incubation += 1
+
+            # адаптивный иммунитет начинает работать после задержки
+            if self.incubation >= self.immunity.adaptive_delay:
+                self.immunity.antibody_level += 0.02
+
+            # переход в инфекционную фазу
             if self.incubation >= virus.time_incubation:
                 self.status = 'infected'
+
         elif self.status == 'infected':
             self.days_infected += 1
+
+            # активная выработка антител и рост памяти
+            self.immunity.antibody_level = min(1.0, self.immunity.antibody_level + 0.05)
+            self.immunity.memory_strength = min(1.0, self.immunity.memory_strength + 0.01)
+
+            # завершение болезни
             if self.days_infected >= virus.base_duration:
                 self.status = 'cured'
+                self._cured_time = 10
+
         elif self.status == 'cured':
             self._cured_time -= 1
-            if self.immunity_level > 0:
-                self.immunity_level -= 0.01
             if self._cured_time <= 0:
                 self.status = 'healthy'
                 self.days_infected = 0
                 self.incubation = 0
 
-# Популяция
 class Population:
     def __init__(self, size, infected_count):
         self.people = [Person() for _ in range(size)]
-        # Наделение начальных людей зараженными
         for person in random.sample(self.people, infected_count):
             person.status = 'exposed'
 
-    # Механизм заражения
     def update(self):
         groups = self.group_by_status()
         new_infections = 0
@@ -79,34 +90,39 @@ class Population:
         healthy_group = groups['healthy']
 
         if infected_group and healthy_group:
+
             random.shuffle(healthy_group)
-            infected_group.extend(exposed_group)
-            for infected_person in infected_group:
+
+            infectious = infected_group + exposed_group
+
+            for sick_person in infectious:
                 for _ in range(2):
                     if not healthy_group:
                         break
                     target = healthy_group.pop()
-                    chance = virus.infection_probability * target.susceptibility * (1 - target.immunity_level)
-                    chance *= random.uniform(0.9, 1.1)
-                    # Сравнение случайного шанса с заболеваемостью вируса
+                    chance = virus.infection_probability
+                    chance *= (1 - target.immunity.innate_strength)
+                    chance *= max(0.05, 1 - target.immunity.antibody_level)
+                    chance *= (1 - target.immunity.memory_strength)
+
+                    if target.immunity.immunocompromised:
+                        chance *= 1.5
+
                     if random.random() < chance:
                         target.status = 'exposed'
                         target.incubation = 0
                         new_infections += 1
+
         return new_infections
 
-    # Группировка по статусу
+    # группировка людей
     def group_by_status(self):
         groups = defaultdict(list)
         for person in self.people:
             groups[person.status].append(person)
         return groups
 
-    # Получение статистики
-    def get_statistics(self):
-        return {status: len(group) for status, group in self.group_by_status().items()}
 
-# Абстрактный класс моделей
 class BaseModel(ABC):
     def __init__(self, population_size, days):
         self.population_size = population_size
@@ -117,7 +133,6 @@ class BaseModel(ABC):
     def run(self, log_callback):
         pass
 
-# Агентная модель
 class AgentBasedModel(BaseModel):
     def __init__(self, population_size, days):
         super().__init__(population_size, days)
@@ -126,9 +141,9 @@ class AgentBasedModel(BaseModel):
         self.peak_day = 0
         self.max_infected = 0
 
-    # Запуск относительно агентной модели
     def run(self, log_callback):
         for day in range(self.days):
+
             groups = self.population.group_by_status()
             healthy = len(groups.get('healthy', []))
             exposed = len(groups.get('exposed', []))
@@ -149,6 +164,7 @@ class AgentBasedModel(BaseModel):
                 f"Здоровые: {healthy}, Подверженные: {exposed}, Заражённые: {infected}, Вылеченные: {cured}"
             )
 
+            # раннее завершение, если эпидемия закончилась
             if (infected == 0 and exposed == 0) or healthy == 0:
                 log_callback("Симуляция завершена.")
                 break
@@ -158,7 +174,6 @@ class AgentBasedModel(BaseModel):
 
         return self.history
 
-# Математическая модель
 class MathematicalModel(BaseModel):
     def __init__(self, population_size, days):
         super().__init__(population_size, days)
@@ -167,9 +182,10 @@ class MathematicalModel(BaseModel):
         self.peak_day = 0
         self.max_infected = 0
 
+        # SEIRS параметры
         self.beta = 0.3
-        self.sigma = 1/2
-        self.gamma = 1/6
+        self.sigma = 1 / 2
+        self.gamma = 1 / 6
         self.T_immunity = 10
         self.delta = 1 / self.T_immunity
 
@@ -179,7 +195,6 @@ class MathematicalModel(BaseModel):
         self.I = 0
         self.R = 0
 
-    # Запуск относительно математической модели
     def run(self, log_callback):
         for day in range(self.days):
             new_exposed = self.beta * self.S * self.I / self.population_size
@@ -214,7 +229,6 @@ class MathematicalModel(BaseModel):
 
         return self.history
 
-# Гибридная модель
 class HybrydModel(BaseModel):
     def run(self, log_callback):
         log_callback("Гибридная модель пока не реализована.")
