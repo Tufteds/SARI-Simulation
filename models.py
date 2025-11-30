@@ -1,5 +1,6 @@
 # Начальные модули
 import random
+import numpy as np
 from collections import defaultdict
 from abc import ABC, abstractmethod
 from utils import singleton
@@ -96,7 +97,7 @@ class Population:
             infectious = infected_group + exposed_group
 
             for sick_person in infectious:
-                for _ in range(2):
+                for _ in range(np.random.poisson(7)):
                     if not healthy_group:
                         break
                     target = healthy_group.pop()
@@ -136,7 +137,7 @@ class BaseModel(ABC):
 class AgentBasedModel(BaseModel):
     def __init__(self, population_size, days):
         super().__init__(population_size, days)
-        self.population = Population(population_size, round(population_size * 0.05))
+        self.population = Population(population_size, round(population_size * 0.01))
         self.history = {'healthy': [], 'exposed': [], 'infected': [], 'cured': []}
         self.peak_day = 0
         self.max_infected = 0
@@ -177,7 +178,7 @@ class AgentBasedModel(BaseModel):
 class MathematicalModel(BaseModel):
     def __init__(self, population_size, days):
         super().__init__(population_size, days)
-        self.population = Population(population_size, round(population_size * 0.05))
+        self.population = Population(population_size, round(population_size * 0.01))
         self.history = {'healthy': [], 'exposed': [], 'infected': [], 'cured': []}
         self.peak_day = 0
         self.max_infected = 0
