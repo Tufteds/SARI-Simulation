@@ -1,5 +1,6 @@
 # Начальные модули
 import random
+import numpy as np
 from collections import defaultdict
 from abc import ABC, abstractmethod
 from utils import singleton
@@ -70,7 +71,8 @@ class Population:
         if infected_group and healthy_group:
             random.shuffle(healthy_group)
             for infected_person in infected_group:
-                for _ in range(2):
+                contacts = np.random.poisson(7)  # среднее 2 контакта
+                for _ in range(contacts):
                     if not healthy_group:
                         break
                     target = healthy_group.pop()
@@ -109,7 +111,7 @@ class BaseModel(ABC):
 class AgentBasedModel(BaseModel):
     def __init__(self, population_size, days):
         super().__init__(population_size, days)
-        self.population = Population(population_size, round(population_size * 0.05))
+        self.population = Population(population_size, max(1, round(population_size * 0.01)))
         self.history = {'healthy': [], 'exposed': [], 'infected': [], 'cured': []}
         self.peak_day = 0
         self.max_infected = 0
