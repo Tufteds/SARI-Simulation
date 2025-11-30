@@ -3,6 +3,16 @@ import random
 from collections import defaultdict
 from abc import ABC, abstractmethod
 from utils import singleton
+from dataclasses import dataclass
+
+@dataclass
+class Immunity:
+    innate_strength: float = 1.0
+    adaptive_delay: int = 3
+    antibody_level: float = 0.0
+    memory_strength: float = 0.0
+    memory_decay_rate: float = 0.01
+    immunocompromised: bool = False
 
 # Вирус в единственном экземпляре
 @singleton
@@ -65,10 +75,12 @@ class Population:
             person.update_infections()
 
         infected_group = groups['infected']
+        exposed_group = groups['exposed']
         healthy_group = groups['healthy']
 
         if infected_group and healthy_group:
             random.shuffle(healthy_group)
+            infected_group.extend(exposed_group)
             for infected_person in infected_group:
                 for _ in range(2):
                     if not healthy_group:
