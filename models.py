@@ -84,6 +84,8 @@ class Person:
                 self._day_vactinated += 1
             if self._day_vactinated >= 14:
                 self.vactinated = False
+                self._day_vactinated = 0
+            chance += 0.01
 
 class Population:
     def __init__(self, size, infected_count):
