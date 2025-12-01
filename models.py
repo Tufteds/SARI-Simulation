@@ -75,17 +75,17 @@ class Person:
                 self.days_infected = 0
                 self.incubation = 0
 
-        elif self.status == 'healthy' and not(self.vactinated):
-            chance = 0.05
+        elif self.status == 'healthy' and not self.vactinated:
+            chance = 0.01
             if random.random() < chance:
                 self.vactinated = True
-                self.immunity.antibody_level += 0.1
-                self.immunity.memory_strength += 0.03
-                self._day_vactinated += 1
-            if self._day_vactinated >= 14:
-                self.vactinated = False
                 self._day_vactinated = 0
-            chance += 0.01
+                self.immunity.antibody_level = min(1.0, self.immunity.antibody_level + 0.4)
+                self.immunity.memory_strength = min(1.0, self.immunity.memory_strength + 0.2)
+            if self.vactinated:
+                self._day_vactinated += 1
+                if self._day_vactinated >= 14:
+                    self.vactinated = False
 
 class Population:
     def __init__(self, size, infected_count):
@@ -111,7 +111,7 @@ class Population:
             infectious = infected_group + exposed_group
 
             for sick_person in infectious:
-                for _ in range(np.random.poisson(7)):
+                for _ in range(np.random.poisson(3)):
                     if not healthy_group:
                         break
                     target = healthy_group.pop()
@@ -212,7 +212,7 @@ class MathematicalModel(BaseModel):
 
     def run(self, log_callback):
         for day in range(self.days):
-            new_exposed = self.beta * self.S * self.I / self.population_size
+            new_exposed = np.random.poisson(self.beta * self.S * self.I / self.population_size)
             new_infected = self.sigma * self.E
             new_recovered = self.gamma * self.I
             back_to_susceptible = self.delta * self.R
@@ -241,6 +241,9 @@ class MathematicalModel(BaseModel):
                 f"Здоровые: {int(self.S)}, Подверженные: {int(self.E)}, "
                 f"Заражённые: {int(self.I)}, Вылеченные: {int(self.R)}"
             )
+
+            new_infected = self.population.update()
+            log_callback(f"Новые заражённые: {new_infected}")
 
         return self.history
 
