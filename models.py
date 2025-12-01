@@ -36,6 +36,8 @@ class Person:
         self.days_infected = 0
         self.incubation = 0
         self.immunity = Immunity()
+        self.vactinated = False
+        self._day_vactinated = 0
         self._cured_time = 0
 
     # Логика обновления состояния и иммунитета
@@ -72,6 +74,18 @@ class Person:
                 self.status = 'healthy'
                 self.days_infected = 0
                 self.incubation = 0
+
+        elif self.status == 'healthy' and not(self.vactinated):
+            chance = 0.05
+            if random.random() < chance:
+                self.vactinated = True
+                self.immunity.antibody_level += 0.1
+                self.immunity.memory_strength += 0.03
+                self._day_vactinated += 1
+            if self._day_vactinated >= 14:
+                self.vactinated = False
+                self._day_vactinated = 0
+            chance += 0.01
 
 class Population:
     def __init__(self, size, infected_count):
