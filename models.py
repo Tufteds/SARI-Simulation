@@ -1,6 +1,7 @@
 # Начальные модули
 import random
 import numpy as np
+import json
 from collections import defaultdict
 from abc import ABC, abstractmethod
 from utils import singleton
@@ -187,6 +188,9 @@ class AgentBasedModel(BaseModel):
             new_infected = self.population.update()
             log_callback(f"Новые заражённые: {new_infected}")
 
+        with open("data.json", "w") as f:
+            json.dump(self.history, f, indent=4)
+
         return self.history
 
 class MathematicalModel(BaseModel):
@@ -244,6 +248,9 @@ class MathematicalModel(BaseModel):
 
             new_infected = self.population.update()
             log_callback(f"Новые заражённые: {new_infected}")
+
+            with open("data.json", "w") as f:
+                json.dump(self.history, f, indent=4)
 
         return self.history
 
