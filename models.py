@@ -14,7 +14,7 @@ class Immunity:
     antibody_level: float = 0.0         # текущий уровень антител (0–1)
     memory_strength: float = 0.0        # иммунная память (0–1)
     memory_decay_rate: float = 0.01     # спад памяти
-    immunocompromised: bool = False     # слабый иммунитет?
+    immunocompromised: bool = False     # слабый иммунитет
 
 # Вирус в единственном экземпляре
 @singleton
