@@ -199,7 +199,7 @@ class MathematicalModel(BaseModel):
     def __init__(self, population_size, days):
         super().__init__(population_size, days)
         self.population = Population(population_size, round(population_size * 0.01))
-        self.history = {'healthy': [], 'exposed': [], 'infected': [], 'cured': []}
+        self.history = {'healthy': [], 'vaccinations': [], 'exposed': [], 'infected': [], 'cured': []}
         self.peak_day = 0
         self.max_infected = 0
 
@@ -243,6 +243,7 @@ class MathematicalModel(BaseModel):
             self.R = max(self.R, 0)
 
             self.history['healthy'].append(int(self.S))
+            self.history['vaccinations'].append(int(self.V))
             self.history['exposed'].append(int(self.E))
             self.history['infected'].append(int(self.I))
             self.history['cured'].append(int(self.R))

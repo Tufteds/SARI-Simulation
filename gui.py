@@ -189,6 +189,7 @@ class GUI():
         # Берём данные
         days = list(range(len(history['infected'])))
         healthy = history['healthy']
+        vaccinated = history['vaccinations']
         exposed = history['exposed']
         infected = history['infected']
         cured = history['cured']
@@ -196,9 +197,10 @@ class GUI():
         # Линейный график с анимацией
         if chart_type == "Линейный":
             plot.set_xlim(0, len(days))
-            plot.set_ylim(0, max(healthy + exposed + infected + cured))
+            plot.set_ylim(0, max(healthy + vaccinated + exposed + infected + cured))
 
             line_h, = plot.plot([], [], label='Здоровые', color='green')
+            line_v, = plot.plot([], [], label='Вакцинированные', color='yellow')
             line_e, = plot.plot([], [], label='Подверженные', color='orange')
             line_i, = plot.plot([], [], label='Заражённые', color='red')
             line_c, = plot.plot([], [], label='Вылеченные', color='blue')
@@ -212,13 +214,14 @@ class GUI():
             # Обновление кадров
             def update(frame):
                 line_h.set_data(days[:frame], healthy[:frame])
+                line_v.set_data(days[:frame], vaccinated[:frame])
                 line_e.set_data(days[:frame], exposed[:frame])
                 line_i.set_data(days[:frame], infected[:frame])
                 line_c.set_data(days[:frame], cured[:frame])
 
                 self.graph_canvas.draw()
 
-                return line_h, line_e, line_i, line_c
+                return line_h, line_v, line_e, line_i, line_c
 
             # Запуск анимации
             self.animation = FuncAnimation(fig, update,
