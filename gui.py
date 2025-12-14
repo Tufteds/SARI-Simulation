@@ -200,7 +200,7 @@ class GUI():
             plot.set_ylim(0, max(healthy + vaccinated + exposed + infected + cured))
 
             line_h, = plot.plot([], [], label='Здоровые', color='green')
-            line_v, = plot.plot([], [], label='Вакцинированные', color='yellow')
+            line_v, = plot.plot([], [], label='Вакцинированные', color='purple')
             line_e, = plot.plot([], [], label='Подверженные', color='orange')
             line_i, = plot.plot([], [], label='Заражённые', color='red')
             line_c, = plot.plot([], [], label='Вылеченные', color='blue')
