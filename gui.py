@@ -160,6 +160,10 @@ class GUI():
         # Запуск модели
         self.sim.run(self.log_message)
 
+        if hasattr(self.sim, 'peak_day'):
+            self.peak_day = self.sim.peak_day
+            self.log_message(f"День пика заражений: {self.peak_day}")
+
         # Отрисовка графика
         self.draw_graph(self.sim.history)
 
@@ -204,6 +208,11 @@ class GUI():
             line_e, = plot.plot([], [], label='Подверженные', color='orange')
             line_i, = plot.plot([], [], label='Заражённые', color='red')
             line_c, = plot.plot([], [], label='Вылеченные', color='blue')
+
+            peak_day_idx = self.peak_day - 1 if hasattr(self, 'peak_day') else None
+            if peak_day_idx is not None:
+                peak_value = infected[peak_day_idx]
+                plot.plot(peak_day_idx, peak_value, 'ro', markersize=8, label='Пик заражений')
 
             plot.set_xlabel('Дни')
             plot.set_ylabel('Люди')
