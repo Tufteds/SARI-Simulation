@@ -10,6 +10,7 @@ from models import AgentBasedModel, MathematicalModel, HybrydModel
 class GUI():
     def __init__(self, root):
         self.root = root
+        self.animate_graph = tk.BooleanVar(value=True)
         self.font = ('Segoe UI', 13)
         self.graph_canvas = None
         self.build_ui()
@@ -19,7 +20,15 @@ class GUI():
         top = tk.Toplevel(self.root)
         top.title("Расширенные настройки")
         top.geometry("400x300")
-        tk.Label(top, text="Здесь будут расширенные настройки", font=self.font).pack(pady=20)
+
+        tk.Label(top, text="Расширенные настройки", font=self.font).pack(pady=20)
+        tk.Checkbutton(
+            top,
+            text="Анимировать график",
+            variable=self.animate_graph,
+            font=self.font
+        ).pack(pady=10)
+
         tk.Button(top, text="Закрыть", command=top.destroy).pack(pady=20)
 
     # Построение окна
@@ -220,25 +229,43 @@ class GUI():
             plot.legend()
             plot.grid(True, linestyle='--', alpha=0.5)
 
-            # Обновление кадров
-            def update(frame):
-                line_h.set_data(days[:frame], healthy[:frame])
-                line_v.set_data(days[:frame], vaccinated[:frame])
-                line_e.set_data(days[:frame], exposed[:frame])
-                line_i.set_data(days[:frame], infected[:frame])
-                line_c.set_data(days[:frame], cured[:frame])
+            if self.animate_graph.get():  # <<< проверка галочки
+                # Линии для анимации
+                line_h, = plot.plot([], [], label='Здоровые', color='green')
+                line_v, = plot.plot([], [], label='Вакцинированные', color='purple')
+                line_e, = plot.plot([], [], label='Подверженные', color='orange')
+                line_i, = plot.plot([], [], label='Заражённые', color='red')
+                line_c, = plot.plot([], [], label='Вылеченные', color='blue')
+                plot.legend()
 
+                # Обновление кадров
+                def update(frame):
+                    line_h.set_data(days[:frame], healthy[:frame])
+                    line_v.set_data(days[:frame], vaccinated[:frame])
+                    line_e.set_data(days[:frame], exposed[:frame])
+                    line_i.set_data(days[:frame], infected[:frame])
+                    line_c.set_data(days[:frame], cured[:frame])
+
+                    self.graph_canvas.draw()
+
+                    return line_h, line_v, line_e, line_i, line_c
+
+                # Запуск анимации
+                self.animation = FuncAnimation(fig, update,
+                                               frames=len(days),
+                                               interval=40,
+                                               repeat=False)
+
+                return
+            else:
+                # Статичный график без анимации
+                plot.plot(days, healthy, label='Здоровые', color='green')
+                plot.plot(days, vaccinated, label='Вакцинированные', color='purple')
+                plot.plot(days, exposed, label='Подверженные', color='orange')
+                plot.plot(days, infected, label='Заражённые', color='red')
+                plot.plot(days, cured, label='Вылеченные', color='blue')
+                plot.legend()
                 self.graph_canvas.draw()
-
-                return line_h, line_v, line_e, line_i, line_c
-
-            # Запуск анимации
-            self.animation = FuncAnimation(fig, update,
-                                           frames=len(days),
-                                           interval=40,
-                                           repeat=False)
-
-            return
 
         # Круговая диаграмма
         elif chart_type == "Круговой":
