@@ -213,16 +213,17 @@ class MathematicalModel(BaseModel):
         self.T_immunity = 10
         self.delta = 1 / self.T_immunity
 
-        initial_infected = round(population_size * 0.05)
-        self.S = population_size - initial_infected
+        initial_exposed = round(population_size * 0.03)
+        initial_infected = round(population_size * 0.02)
+        self.S = population_size - initial_infected - initial_exposed
         self.V = 0
-        self.E = initial_infected
-        self.I = 0
+        self.E = initial_exposed
+        self.I = initial_infected
         self.R = 0
 
     def run(self, log_callback):
         for day in range(self.days):
-            new_exposed = np.random.poisson(self.beta * self.S * self.I / self.population_size)
+            new_exposed = self.beta * self.S * self.I / self.population_size
             new_vaccinations = self.vaccination_rate * self.S
             infected_vaccinated = self.epsilon * self.beta * self.V * self.I / self.population_size
             lost_immunity_v = self.omega_v * self.V
@@ -230,9 +231,9 @@ class MathematicalModel(BaseModel):
             new_recovered = self.gamma * self.I
             back_to_susceptible = self.delta * self.R
 
-            self.S += back_to_susceptible - new_exposed
+            self.S += back_to_susceptible - new_exposed - new_vaccinations + lost_immunity_v
             self.V += new_vaccinations - infected_vaccinated - lost_immunity_v
-            self.E += new_exposed - new_infected
+            self.E += new_exposed - new_infected - infected_vaccinated
             self.I += new_infected - new_recovered
             self.R += new_recovered - back_to_susceptible
 
