@@ -157,6 +157,21 @@ class GUI():
 
         self.log_output.delete(1.0, tk.END)
 
+        import pandas as pd
+        pop_df = pd.read_csv("data/school/population.csv")
+        N = int(pop_df["count"].sum())
+
+        vac_df = pd.read_csv("data/school/vaccination.csv")
+        vaccinated_percent = vac_df["vaccinated_percent"].mean()
+
+        V0 = int(N * vaccinated_percent)
+        I0 = 23
+        E0 = int(1.5 * I0)
+        R0 = 0
+        S0 = N - V0 - I0 - E0
+        self.log_message(f"Инициализация: S0={S0}, E0={E0}, I0={I0}, R0={R0}, V0={V0}")
+        print("SUM =", S0 + V0 + E0 + I0 + R0, N)
+
         # Выбор модели
         if selected_model == 'Агентная':
             self.sim = AgentBasedModel(population_size, days)
