@@ -262,9 +262,6 @@ class MathematicalModel(BaseModel):
             new_infected = self.population.update()
             log_callback(f"Новые заражённые: {new_infected}")
 
-            with open("data.json", "w") as f:
-                json.dump(self.history, f, indent=4)
-
         return self.history
 
 class HybrydModel(BaseModel):
