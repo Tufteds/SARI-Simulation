@@ -211,23 +211,24 @@ class GUI():
         if chart_type == "Линейный":
             plot.set_xlim(0, len(days))
             plot.set_ylim(0, max(healthy + vaccinated + exposed + infected + cured))
-
-            line_h, = plot.plot([], [], label='Здоровые', color='green')
-            line_v, = plot.plot([], [], label='Вакцинированные', color='purple')
-            line_e, = plot.plot([], [], label='Подверженные', color='orange')
-            line_i, = plot.plot([], [], label='Заражённые', color='red')
-            line_c, = plot.plot([], [], label='Вылеченные', color='blue')
+            plot.set_xlabel('Дни')
+            plot.set_ylabel('Люди')
+            plot.set_title('Симуляция')
+            plot.grid(True, linestyle='--', alpha=0.5)
 
             peak_day_idx = self.peak_day - 1 if hasattr(self, 'peak_day') else None
             if peak_day_idx is not None:
                 peak_value = infected[peak_day_idx]
                 plot.plot(peak_day_idx, peak_value, 'ro', markersize=8, label='Пик заражений')
 
-            plot.set_xlabel('Дни')
-            plot.set_ylabel('Люди')
-            plot.set_title('Симуляция')
+            line_h, = plot.plot([], [], color='green', label='Здоровые')
+            line_v, = plot.plot([], [], color='purple', label='Вакцинированные')
+            line_e, = plot.plot([], [], color='orange', label='Подверженные')
+            line_i, = plot.plot([], [], color='red', label='Заражённые')
+            line_c, = plot.plot([], [], color='blue', label='Вылеченные')
+
             plot.legend()
-            plot.grid(True, linestyle='--', alpha=0.5)
+
 
             if self.animate_graph.get():  # <<< проверка галочки
                 # Обновление кадров
@@ -238,27 +239,29 @@ class GUI():
                     line_i.set_data(days[:frame], infected[:frame])
                     line_c.set_data(days[:frame], cured[:frame])
 
-                    self.graph_canvas.draw()
-
                     return line_h, line_v, line_e, line_i, line_c
 
                 # Запуск анимации
-                self.animation = FuncAnimation(fig, update,
-                                               frames=len(days),
-                                               interval=40,
-                                               repeat=False)
+                self.animation = FuncAnimation(
+                    fig,
+                    update,
+                    frames=len(days) + 1,
+                    interval=40,
+                    blit=True,
+                    repeat=False
+                )
 
+                self.graph_canvas.draw()
                 return
             else:
-                # Статичный график без анимации
-                plot.plot(days, healthy, label='Здоровые', color='green')
-                plot.plot(days, vaccinated, label='Вакцинированные', color='purple')
-                plot.plot(days, exposed, label='Подверженные', color='orange')
-                plot.plot(days, infected, label='Заражённые', color='red')
-                plot.plot(days, cured, label='Вылеченные', color='blue')
-                plot.legend()
-                self.graph_canvas.draw()
+                line_h.set_data(days, healthy)
+                line_v.set_data(days, vaccinated)
+                line_e.set_data(days, exposed)
+                line_i.set_data(days, infected)
+                line_c.set_data(days, cured)
 
+                self.graph_canvas.draw()
+                return
         # Круговая диаграмма
         elif chart_type == "Круговой":
             sizes = [
