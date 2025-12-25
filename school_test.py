@@ -13,15 +13,14 @@ real_cases = cases_df["new_cases"].tolist()  # [23, 27, 40, 32, 34]
 days = len(real_cases)
 
 I0 = real_cases[0]        # 23
-E0 = int(0.8 * I0)        # логично
+E0 = int(0.3 * I0)        # логично
 V0 = int(N * vaccinated_percent)
 R0 = 0
 S0 = N - V0 - I0 - E0
 
 model = MathematicalModel(population_size=N, days=days)
-model.beta = 0.45
-model.sigma = 1/2
-model.gamma = 1 / 7
+model.beta = 0.5
+model.gamma = 1/7
 
 model.S = S0
 model.V = V0
