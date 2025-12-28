@@ -1,3 +1,10 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from dataclasses import dataclass
+from typing import List, Dict
+from sklearn.metrics import mean_squared_error, r2_score
+
 # Начальные модули
 import random
 import numpy as np
@@ -269,7 +276,7 @@ class MathematicalModel(BaseModel):
                 f"Заражённые: {int(self.I)}, Вылеченные: {int(self.R)}"
             )
 
-            log_callback(f"Новые заражённые: {int(new_infected)}")
+            log_callback(f"Новые заражённые: {int(new_exposed)}")
 
         return self.history
 
@@ -277,3 +284,241 @@ class HybrydModel(BaseModel):
     def run(self, log_callback):
         log_callback("Гибридная модель пока не реализована.")
         return {'healthy': [], 'exposed': [], 'infected': [], 'cured': []}
+
+
+@dataclass
+class SchoolData:
+    """Класс для хранения данных школы"""
+    population: int
+    vaccinated: int
+    real_cases: List[int]
+    dates: List[str]
+
+    @property
+    def vaccination_rate(self) -> float:
+        return self.vaccinated / self.population
+
+    @property
+    def total_cases(self) -> int:
+        return sum(self.real_cases)
+
+
+# ================== Часть 3: Адаптированные модели для школы ==================
+class SchoolAgentBasedModel(AgentBasedModel):
+    """Агентная модель, адаптированная под школу"""
+
+    def __init__(self, school_data: SchoolData, days: int = 5):
+        super().__init__(school_data.population, days)
+        self.school_data = school_data
+        self._initialize_for_school()
+
+    def _initialize_for_school(self):
+        """Инициализация с реальными данными школы"""
+        # Инициализируем вакцинированных
+        vaccinated_count = self.school_data.vaccinated
+        people_to_vaccinate = random.sample(self.population.people, vaccinated_count)
+        for person in people_to_vaccinate:
+            person.vaccinated = True
+            person.immunity.antibody_level = 0.4
+
+        # Инициализируем начальные случаи
+        initial_cases = self.school_data.real_cases[0] if self.school_data.real_cases else 10
+        people_to_infect = random.sample(self.population.people, min(initial_cases, len(self.population.people)))
+        for person in people_to_infect:
+            if person.vaccinated:
+                if random.random() < 0.5:  # 50% эффективность
+                    person.status = 'exposed'
+            else:
+                person.status = 'exposed'
+
+
+class SchoolMathematicalModel(MathematicalModel):
+    """Математическая модель, адаптированная под школу"""
+
+    def __init__(self, school_data: SchoolData, days: int = 5):
+        super().__init__(school_data.population, days)
+        self.school_data = school_data
+
+        # Переопределяем начальные условия
+        self.S = school_data.population - school_data.vaccinated
+        self.V = school_data.vaccinated
+        self.E = int(school_data.real_cases[0] * 0.3)
+        self.I = int(school_data.real_cases[0] * 0.7)
+        self.R = 0
+
+
+# ================== Часть 4: Калибратор с интерфейсом ==================
+class ModelCalibrator:
+    """Инструмент для калибровки моделей"""
+
+    def __init__(self, school_data: SchoolData):
+        self.data = school_data
+        self.results = {}
+
+    def run_agent_model(self, **params):
+        """Запуск агентной модели"""
+        model = SchoolAgentBasedModel(self.data, days=len(self.data.real_cases))
+        # Здесь можно настроить параметры модели через params
+        history = model.run(lambda x: None)  # Без вывода логов
+
+        # Извлекаем новые случаи из истории
+        simulated_cases = self._extract_new_cases_from_history(history)
+
+        return self._analyze_results(simulated_cases, "agent", params)
+
+    def run_math_model(self, **params):
+        """Запуск математической модели"""
+        model = SchoolMathematicalModel(self.data, days=len(self.data.real_cases))
+        history = model.run(lambda x: None)
+
+        simulated_cases = self._extract_new_cases_from_history(history)
+
+        return self._analyze_results(simulated_cases, "math", params)
+
+    def _extract_new_cases_from_history(self, history):
+        """Извлекает новые случаи из истории модели"""
+        # Простая логика: считаем, что новые случаи = exposed каждый день
+        return history.get('exposed', [])[:len(self.data.real_cases)]
+
+    def _analyze_results(self, simulated, model_type, params):
+        """Анализирует результаты моделирования"""
+        if len(simulated) != len(self.data.real_cases):
+            simulated = simulated[:len(self.data.real_cases)]
+
+        comparison = {
+            'simulated': simulated,
+            'real': self.data.real_cases,
+            'mse': mean_squared_error(self.data.real_cases, simulated),
+            'r2': r2_score(self.data.real_cases, simulated),
+            'params': params
+        }
+
+        self.results[model_type] = comparison
+        return comparison
+
+    def plot_comparison(self, model_type="agent"):
+        """Рисует график сравнения"""
+        if model_type not in self.results:
+            print(f"Нет результатов для модели {model_type}")
+            return
+
+        result = self.results[model_type]
+
+        plt.figure(figsize=(10, 6))
+        days = range(1, len(result['real']) + 1)
+
+        plt.plot(days, result['real'], 'bo-', label='Реальные данные', linewidth=2)
+        plt.plot(days, result['simulated'], 'rs--', label='Модель', linewidth=2)
+
+        plt.xlabel('День')
+        plt.ylabel('Новые случаи')
+        plt.title(f'Сравнение: {model_type} модель\nMSE: {result["mse"]:.1f}, R²: {result["r2"]:.3f}')
+        plt.legend()
+        plt.grid(True, alpha=0.3)
+
+        # Подписи значений
+        for i, (real_val, sim_val) in enumerate(zip(result['real'], result['simulated'])):
+            plt.text(i + 1, real_val + 2, str(real_val), ha='center', color='blue')
+            plt.text(i + 1, sim_val - 2, str(int(sim_val)), ha='center', color='red')
+
+        plt.show()
+
+    def interactive_mode(self):
+        """Интерактивный режим калибровки"""
+        print("=== КАЛИБРОВКА МОДЕЛИ РАСПРОСТРАНЕНИЯ ОРВИ В ШКОЛЕ ===")
+        print(f"Данные школы: {self.data.population} человек, {self.data.vaccinated} вакцинированы")
+        print(f"Реальные случаи: {self.data.real_cases}")
+        print()
+
+        while True:
+            print("\nВыберите действие:")
+            print("1. Запустить агентную модель")
+            print("2. Запустить математическую модель")
+            print("3. Сравнить обе модели")
+            print("4. Выйти")
+
+            choice = input("Ваш выбор (1-4): ")
+
+            if choice == "1":
+                print("\nЗапуск агентной модели...")
+                result = self.run_agent_model()
+                print(f"Результаты: MSE={result['mse']:.1f}, R²={result['r2']:.3f}")
+                self.plot_comparison("agent")
+
+            elif choice == "2":
+                print("\nЗапуск математической модели...")
+                result = self.run_math_model()
+                print(f"Результаты: MSE={result['mse']:.1f}, R²={result['r2']:.3f}")
+                self.plot_comparison("math")
+
+            elif choice == "3":
+                if "agent" in self.results and "math" in self.results:
+                    plt.figure(figsize=(12, 6))
+                    days = range(1, len(self.data.real_cases) + 1)
+
+                    plt.subplot(1, 2, 1)
+                    plt.plot(days, self.results['agent']['real'], 'bo-', label='Реальные')
+                    plt.plot(days, self.results['agent']['simulated'], 'r--', label='Агентная')
+                    plt.title(f"Агентная (MSE: {self.results['agent']['mse']:.1f})")
+                    plt.legend()
+
+                    plt.subplot(1, 2, 2)
+                    plt.plot(days, self.results['math']['real'], 'bo-', label='Реальные')
+                    plt.plot(days, self.results['math']['simulated'], 'g--', label='Математическая')
+                    plt.title(f"Математическая (MSE: {self.results['math']['mse']:.1f})")
+                    plt.legend()
+
+                    plt.tight_layout()
+                    plt.show()
+                else:
+                    print("Сначала запустите обе модели!")
+
+            elif choice == "4":
+                print("Выход...")
+                break
+            else:
+                print("Неверный выбор, попробуйте снова.")
+
+
+# ================== Часть 5: Главная функция запуска ==================
+def main():
+    """Главная функция для запуска программы"""
+
+    # 1. Создаем объект с данными вашей школы
+    my_school_data = SchoolData(
+        population=831,
+        vaccinated=406,
+        real_cases=[51, 68, 83, 87, 86],
+        dates=['2025-12-12', '2025-12-13', '2025-12-14', '2025-12-15', '2025-12-16']
+    )
+
+    print("=" * 50)
+    print("МОДЕЛИРОВАНИЕ ВСПЫШКИ ОРВИ В ШКОЛЕ")
+    print("=" * 50)
+    print(f"Общая популяция: {my_school_data.population} человек")
+    print(f"Вакцинировано: {my_school_data.vaccinated} ({my_school_data.vaccination_rate * 100:.1f}%)")
+    print(f"Реальные случаи за 5 дней: {my_school_data.real_cases}")
+    print(
+        f"Всего случаев: {my_school_data.total_cases} ({my_school_data.total_cases / my_school_data.population * 100:.1f}% популяции)")
+    print("=" * 50)
+
+    # 2. Создаем калибратор
+    calibrator = ModelCalibrator(my_school_data)
+
+    # 3. Запускаем интерактивный режим
+    calibrator.interactive_mode()
+
+    # ИЛИ можно запустить конкретные модели:
+    # result_agent = calibrator.run_agent_model()
+    # result_math = calibrator.run_math_model()
+    # calibrator.plot_comparison("agent")
+    # calibrator.plot_comparison("math")
+
+
+# ================== Запуск программы ==================
+if __name__ == "__main__":
+    # Убедитесь, что у вас установлены необходимые библиотеки:
+    # pip install numpy matplotlib scikit-learn
+
+    # Запускаем программу
+    main()
