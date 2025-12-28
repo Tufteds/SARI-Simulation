@@ -202,7 +202,7 @@ class GUI():
         # Берём данные
         days = list(range(len(history['infected'])))
         healthy = history['healthy']
-        vaccinated = history['vaccinations']
+        vaccinated = history['vaccinated']
         exposed = history['exposed']
         infected = history['infected']
         cured = history['cured']

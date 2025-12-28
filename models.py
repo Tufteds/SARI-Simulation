@@ -163,22 +163,25 @@ class AgentBasedModel(BaseModel):
     def __init__(self, population_size, days):
         super().__init__(population_size, days)
         self.population = Population(population_size, round(population_size * 0.01))
-        self.history = {'healthy': [], 'vaccinations': [], 'exposed': [], 'infected': [], 'cured': []}
+        self.history = {'healthy': [], 'vaccinated': [], 'exposed': [], 'infected': [], 'cured': []}
         self.peak_day = 0
         self.max_infected = 0
 
     def run(self, log_callback):
         for day in range(self.days):
-
+            # Получаем актуальные группы
             groups = self.population.group_by_status()
             healthy = len(groups.get('healthy', []))
-            vaccinations = len(groups.get('vaccinations', []))
             exposed = len(groups.get('exposed', []))
             infected = len(groups.get('infected', []))
             cured = len(groups.get('cured', []))
 
+            # Подсчитываем вакцинированных отдельно
+            vaccinated_count = sum(1 for person in self.population.people
+                                   if person.vaccinated)
+
             self.history['healthy'].append(healthy)
-            self.history['vaccinations'].append(vaccinations)
+            self.history['vaccinated'].append(vaccinated_count)
             self.history['exposed'].append(exposed)
             self.history['infected'].append(infected)
             self.history['cured'].append(cured)
@@ -189,7 +192,8 @@ class AgentBasedModel(BaseModel):
 
             log_callback(f"--- День {day + 1} ---")
             log_callback(
-                f"Здоровые: {healthy}, Подверженные: {exposed}, Заражённые: {infected}, Вылеченные: {cured}"
+                f"Здоровые: {healthy}, Вакцинированные: {vaccinated_count}, "
+                f"Подверженные: {exposed}, Заражённые: {infected}, Вылеченные: {cured}"
             )
 
             # раннее завершение, если эпидемия закончилась
@@ -200,27 +204,23 @@ class AgentBasedModel(BaseModel):
             new_infected = self.population.update()
             log_callback(f"Новые заражённые: {new_infected}")
 
-        with open("data.json", "w") as f:
-            json.dump(self.history, f, indent=4)
-
         return self.history
 
 class MathematicalModel(BaseModel):
     def __init__(self, population_size, days):
         super().__init__(population_size, days)
-        self.population = Population(population_size, round(population_size * 0.01))
-        self.history = {'healthy': [], 'vaccinations': [], 'exposed': [], 'infected': [], 'cured': []}
+        self.history = {'healthy': [], 'vaccinated': [], 'exposed': [], 'infected': [], 'cured': []}
         self.peak_day = 0
         self.max_infected = 0
 
         # SEIRS параметры
         self.beta = 0.3
-        self.epsilon = 0.5
-        self.vaccination_rate = 0.01
-        self.omega_v = 1/90
+        self.epsilon = 0.3
+        self.vaccination_rate = 0.001
+        self.omega_v = 1/180
         self.sigma = 1 / 2
         self.gamma = 1 / 6
-        self.T_immunity = 10
+        self.T_immunity = 90
         self.delta = 1 / self.T_immunity
 
         initial_exposed = round(population_size * 0.03)
@@ -254,7 +254,7 @@ class MathematicalModel(BaseModel):
             self.R = max(self.R, 0)
 
             self.history['healthy'].append(int(self.S))
-            self.history['vaccinations'].append(int(self.V))
+            self.history['vaccinated'].append(int(self.V))
             self.history['exposed'].append(int(self.E))
             self.history['infected'].append(int(self.I))
             self.history['cured'].append(int(self.R))
@@ -269,8 +269,7 @@ class MathematicalModel(BaseModel):
                 f"Заражённые: {int(self.I)}, Вылеченные: {int(self.R)}"
             )
 
-            new_infected = self.population.update()
-            log_callback(f"Новые заражённые: {new_infected}")
+            log_callback(f"Новые заражённые: {int(new_exposed)}")
 
         return self.history
 
