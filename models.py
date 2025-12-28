@@ -37,15 +37,37 @@ class Person:
         self.days_infected = 0
         self.incubation = 0
         self.immunity = Immunity()
-        self.vactinated = False
-        self._day_vactinated = 0
+        self.vaccinated = False
+        self.days_since_vaccination = 0
         self._cured_time = 0
 
     # Логика обновления состояния и иммунитета
     def update_infections(self):
+        # Обновляем иммунитет (антитела и память ослабевают)
         self.immunity.antibody_level = max(0, self.immunity.antibody_level * 0.99)
-        self.immunity.memory_strength = max(0, self.immunity.memory_strength * (1 - self.immunity.memory_decay_rate))
+        self.immunity.memory_strength = max(
+            0, self.immunity.memory_strength * (1 - self.immunity.memory_decay_rate)
+        )
 
+        # Обработка вакцинации для ВСЕХ статусов (кроме infected)
+        if not self.vaccinated and self.status != 'infected' and random.random() < 0.001:
+            self.vaccinated = True
+            self._days_since_vaccination = 0
+            # Вакцинация повышает иммунитет, но не так сильно как болезнь
+            self.immunity.antibody_level = min(1.0, self.immunity.antibody_level + 0.3)
+            self.immunity.memory_strength = min(1.0, self.immunity.memory_strength + 0.15)
+
+        # Если вакцинирован, отслеживаем время
+        if self.vaccinated:
+            self._days_since_vaccination += 1
+            # Вакцинный иммунитет ослабевает через 180 дней (полгода)
+            if self._days_since_vaccination >= 180:
+                self.vaccinated = False
+                # Ослабление иммунитета при потере вакцинной защиты
+                self.immunity.antibody_level *= 0.7
+                self.immunity.memory_strength *= 0.8
+
+        # Логика болезни
         if self.status == 'exposed':
             self.incubation += 1
 
@@ -75,18 +97,6 @@ class Person:
                 self.status = 'healthy'
                 self.days_infected = 0
                 self.incubation = 0
-
-        elif self.status == 'healthy' and not self.vactinated:
-            chance = 0.01
-            if random.random() < chance:
-                self.vactinated = True
-                self._day_vactinated = 0
-                self.immunity.antibody_level = min(1.0, self.immunity.antibody_level + 0.4)
-                self.immunity.memory_strength = min(1.0, self.immunity.memory_strength + 0.2)
-            if self.vactinated:
-                self._day_vactinated += 1
-                if self._day_vactinated >= 14:
-                    self.vactinated = False
 
 class Population:
     def __init__(self, size, infected_count):
