@@ -4,7 +4,7 @@ import numpy as np
 import json
 from collections import defaultdict
 from abc import ABC, abstractmethod
-from utils import singleton
+from utils import singleton, Utils
 from dataclasses import dataclass
 
 @dataclass
@@ -233,7 +233,8 @@ class MathematicalModel(BaseModel):
 
     def run(self, log_callback):
         for day in range(self.days):
-            new_exposed = self.beta * self.S * self.I / self.population_size
+            k = Utils.activity_factor(day)
+            new_exposed = self.beta * self.S * self.I * k / self.population_size
             new_vaccinations = self.vaccination_rate * self.S
             infected_vaccinated = self.epsilon * self.beta * self.V * self.I / self.population_size
             lost_immunity_v = self.omega_v * self.V

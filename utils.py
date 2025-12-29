@@ -23,3 +23,12 @@ class Utils():
         except AttributeError:
             base_path = os.path.abspath(".") # Обычный запуск
         return os.path.join(base_path, relative_path)
+    @staticmethod
+    def activity_factor(day, start_weekday=0):
+        weekday = (day + start_weekday) % 7
+        if weekday < 5:  # пн–пт
+            return 1.0
+        elif weekday == 5:  # суббота
+            return 0.3
+        else:  # воскресенье
+            return 0.05
