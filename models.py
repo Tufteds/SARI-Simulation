@@ -212,6 +212,7 @@ class MathematicalModel(BaseModel):
         self.history = {'healthy': [], 'vaccinated': [], 'exposed': [], 'infected': [], 'cured': []}
         self.peak_day = 0
         self.max_infected = 0
+        self.history_file = "data/simulation_history.json"
 
         # SEIRS параметры
         self.beta = 0.3
@@ -223,6 +224,8 @@ class MathematicalModel(BaseModel):
         self.T_immunity = 90
         self.delta = 1 / self.T_immunity
 
+
+
         initial_exposed = round(population_size * 0.03)
         initial_infected = round(population_size * 0.02)
         self.S = population_size - initial_infected - initial_exposed
@@ -232,6 +235,8 @@ class MathematicalModel(BaseModel):
         self.R = 0
 
     def run(self, log_callback):
+        with open(self.history_file, "w", encoding="utf-8") as f:
+            json.dump({}, f)
         for day in range(self.days):
             k = Utils.activity_factor(day)
             new_exposed = self.beta * self.S * self.I * k / self.population_size
@@ -271,6 +276,29 @@ class MathematicalModel(BaseModel):
             )
 
             log_callback(f"Новые заражённые: {int(new_infected)}")
+
+            result = {
+                "meta": {
+                    "population_size": self.population_size,
+                    "days": self.days,
+                    "peak_day": self.peak_day + 1,
+                    "max_infected": self.max_infected,
+                },
+                "parameters": {
+                    "beta": self.beta,
+                    "epsilon": self.epsilon,
+                    "vaccination_rate": self.vaccination_rate,
+                    "omega_v": self.omega_v,
+                    "sigma": self.sigma,
+                    "gamma": self.gamma,
+                    "T_immunity": self.T_immunity,
+                    "delta": self.delta
+                },
+                "history": self.history
+            }
+
+            with open(self.history_file, "w", encoding="utf-8") as f:
+                json.dump(result, f, ensure_ascii=False, indent=4)
 
         return self.history
 
