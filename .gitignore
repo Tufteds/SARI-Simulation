@@ -13,5 +13,6 @@ Thumbs.db
 *.ico
 *.png
 *.spec
+*.json
 versions/
 script.py

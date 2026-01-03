@@ -215,7 +215,7 @@ class MathematicalModel(BaseModel):
         self.history_file = "data/simulation_history.json"
 
         # SEIRS параметры
-        self.beta = 0.3
+        self.beta = 0.4
         self.epsilon = 0.3
         self.vaccination_rate = 0.001
         self.omega_v = 1/180
@@ -228,18 +228,18 @@ class MathematicalModel(BaseModel):
 
         initial_exposed = round(population_size * 0.03)
         initial_infected = round(population_size * 0.02)
-        self.S = population_size - initial_infected - initial_exposed
-        self.V = 0
+        self.V = round(0.46 * population_size)
+        self.S = population_size - initial_infected - initial_exposed - self.V
         self.E = initial_exposed
         self.I = initial_infected
         self.R = 0
 
     def run(self, log_callback):
+        hidden_I = 0
         with open(self.history_file, "w", encoding="utf-8") as f:
             json.dump({}, f)
         for day in range(self.days):
-            k = Utils.activity_factor(day)
-            new_exposed = self.beta * self.S * self.I * k / self.population_size
+            new_exposed = self.beta * self.S * self.I / self.population_size
             new_vaccinations = self.vaccination_rate * self.S
             infected_vaccinated = self.epsilon * self.beta * self.V * self.I / self.population_size
             lost_immunity_v = self.omega_v * self.V
@@ -249,7 +249,7 @@ class MathematicalModel(BaseModel):
 
             self.S += back_to_susceptible - new_exposed - new_vaccinations + lost_immunity_v
             self.V += new_vaccinations - infected_vaccinated - lost_immunity_v
-            self.E += new_exposed - new_infected - infected_vaccinated
+            self.E += new_exposed + infected_vaccinated - new_infected
             self.I += new_infected - new_recovered
             self.R += new_recovered - back_to_susceptible
 
@@ -259,10 +259,17 @@ class MathematicalModel(BaseModel):
             self.I = max(self.I, 0)
             self.R = max(self.R, 0)
 
+            if (day-1) % 6 == 0:  # сб, вс
+                # видим только 5/20 классов
+                observed_I = self.I * 0.4
+            else:  # будни
+                # видим всех
+                observed_I = self.I
+
             self.history['healthy'].append(int(self.S))
             self.history['vaccinated'].append(int(self.V))
             self.history['exposed'].append(int(self.E))
-            self.history['infected'].append(int(self.I))
+            self.history['infected'].append(int(observed_I))
             self.history['cured'].append(int(self.R))
 
             if self.I > self.max_infected:

@@ -40,7 +40,7 @@ ax.legend(handles=legend_elements)
 math_model = MathematicalModel(population_size=population, days=len(data))
 math_model.I = 27
 math_model.V = 356
-math_model.E = 20
+math_model.E = 10
 math_model.beta = 0.5
 
 math_model.run(print)
