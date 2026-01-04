@@ -242,7 +242,7 @@ class MathematicalModel(BaseModel):
             if day <= self.peak_day:
                 effective_gamma = self.gamma
                 effective_beta = self.beta
-            elif day - self.peak_day >= 3:
+            elif day - self.peak_day >= 3 and (day)%6!=0:
                 effective_gamma = self.gamma * 1.3
                 effective_beta = self.beta * 0.1
             else:
