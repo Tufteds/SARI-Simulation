@@ -1,6 +1,7 @@
 # Начальные модули
 import sys
 import os
+import math
 
 # Синглтон
 def singleton(cls):
@@ -29,3 +30,6 @@ class Utils():
             return 0.4
         else:
             return 1.0
+    @staticmethod
+    def is_season_peak(day):
+        return 1.0 + 0.6 * math.sin(2 * math.pi * day / 180)

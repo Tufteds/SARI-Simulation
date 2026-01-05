@@ -213,12 +213,11 @@ class MathematicalModel(BaseModel):
         self.peak_day = 0
         self.max_infected = 0
         self.history_file = "data/simulation_history.json"
-        self.imported_exposed = 3
 
         # SEIRS параметры
-        self.beta = 0.3
+        self.beta = 0.2
         self.epsilon = 0.3
-        self.vaccination_rate = 0.01
+        self.vaccination_rate = 0.1
         self.omega_v = 1/180
         self.sigma = 1 / 1.5
         self.gamma = 1 / 7
@@ -239,19 +238,26 @@ class MathematicalModel(BaseModel):
 
         for day in range(self.days):
             k = Utils.activity_factor(day)
+            season = Utils.is_season_peak(day)
+
+            if season > 1.4:
+                new_vaccinations = self.vaccination_rate * self.S
+                imported_exposed = 1
+            else:
+                new_vaccinations = 0
+                imported_exposed = np.random.poisson(2 + season)
 
             if day <= self.peak_day:
                 effective_gamma = self.gamma
                 effective_beta = self.beta
-            elif day - self.peak_day >= 3 and (day)%6!=0:
-                effective_gamma = self.gamma * 1.3
-                effective_beta = self.beta * 0.1
+            elif day - self.peak_day >= 3:
+                effective_gamma = self.gamma * 1.15
+                effective_beta = self.beta * 0.35
             else:
-                effective_gamma = self.gamma*1.2
-                effective_beta = self.beta*k
+                effective_gamma = self.gamma * 1.1
+                effective_beta = self.beta * k
 
             new_exposed = effective_beta* self.S * self.I *k / self.population_size
-            new_vaccinations = self.vaccination_rate * self.S
             infected_vaccinated = self.epsilon * effective_beta * k * self.V * self.I / self.population_size
             lost_immunity_v = self.omega_v * self.V
             new_infected = self.sigma * self.E
@@ -260,13 +266,13 @@ class MathematicalModel(BaseModel):
 
             self.S += back_to_susceptible - new_exposed - new_vaccinations + lost_immunity_v
             self.V += new_vaccinations - infected_vaccinated - lost_immunity_v
-            self.E += new_exposed + infected_vaccinated - new_infected
+            self.E += new_exposed + infected_vaccinated - new_infected + imported_exposed
             self.I += new_infected - new_recovered
             self.R += new_recovered - back_to_susceptible
 
             self.S = max(self.S, 0)
             self.V = max(self.V, 0)
-            self.E = max(self.E, 0) + self.imported_exposed
+            self.E = max(self.E, 0)
             self.I = max(self.I, 0)
             self.R = max(self.R, 0)
 
