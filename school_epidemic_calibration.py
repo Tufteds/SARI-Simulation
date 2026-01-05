@@ -19,7 +19,7 @@ with open('data/school/orvi_cases.csv', 'r', encoding='UTF-8') as f1, \
 colors = []
 for day in data:
     if day % 6 == 0:
-        colors.append('gold')
+        colors.append('green')
     else:
         colors.append('steelblue')
 
@@ -29,12 +29,6 @@ ax.bar(data, cases, color=colors)
 ax.set_ylabel('Количество заболевших')
 ax.set_xlabel('День')
 ax.set_title('Активность вируса ОРВИ 12.12.2025–29.12.2025')
-
-legend_elements = [
-    Patch(facecolor='steelblue', label='Обычный день'),
-    Patch(facecolor='gold', label='Суббота')
-]
-ax.legend(handles=legend_elements)
 
 math_model = MathematicalModel(population_size=population, days=len(data))
 math_model.I = 87
@@ -125,10 +119,39 @@ ax.set_ylim(0, max(model_cases)*1.05)  # чуть выше максимума д
 plt.tight_layout()
 plt.show()
 
+import matplotlib.pyplot as plt
+
+# ------------------ ДАННЫЕ ------------------
+model_cases = [
+    21, 25, 27, 29, 31, 34, 36, 39, 41, 44, 46, 49, 52
+]
+
+# Дни для графика
+data = list(range(1, len(model_cases)+1))
+
+# ------------------ ГРАФИК ------------------
+fig, ax = plt.subplots(figsize=(10,5))
+
+ax.bar(
+    data,
+    model_cases,
+    color='crimson'
+)
+ax.set_xlabel('День')
+ax.set_ylabel('Количество заболевших')
+ax.set_title('Результаты математической модели ОРВИ')
+ax.set_ylim(0, max(model_cases)*1.05)  # чуть выше максимума для красоты
+
+plt.tight_layout()
+plt.show()
+
 # ------------------ ТАБЛИЦА ------------------
 print("День | Модель")
 print("-" * 20)
 for d, model in zip(data, model_cases):
     print(f"{d:>4} | {model:>6}")
 
-print("beta =", math_model.beta)
+
+
+
+

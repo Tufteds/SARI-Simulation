@@ -213,11 +213,12 @@ class MathematicalModel(BaseModel):
         self.peak_day = 0
         self.max_infected = 0
         self.history_file = "data/simulation_history.json"
+        self.imported_exposed = 3
 
         # SEIRS параметры
         self.beta = 0.3
         self.epsilon = 0.3
-        self.vaccination_rate = 0.3
+        self.vaccination_rate = 0.01
         self.omega_v = 1/180
         self.sigma = 1 / 1.5
         self.gamma = 1 / 7
@@ -226,7 +227,7 @@ class MathematicalModel(BaseModel):
 
         initial_exposed = round(population_size * 0.03)
         initial_infected = round(population_size * 0.05)
-        self.V = round(0.46 * population_size)
+        self.V = 0
         self.S = population_size - initial_infected - initial_exposed - self.V
         self.E = initial_exposed
         self.I = initial_infected
@@ -265,21 +266,15 @@ class MathematicalModel(BaseModel):
 
             self.S = max(self.S, 0)
             self.V = max(self.V, 0)
-            self.E = max(self.E, 0)
+            self.E = max(self.E, 0) + self.imported_exposed
             self.I = max(self.I, 0)
             self.R = max(self.R, 0)
-
-
-            if (day+1)%6==0:
-                observed_i = self.I*0.3
-            else:
-                observed_i = self.I
 
 
             self.history['healthy'].append(int(self.S))
             self.history['vaccinated'].append(int(self.V))
             self.history['exposed'].append(int(self.E))
-            self.history['infected'].append(int(observed_i))
+            self.history['infected'].append(int(self.I))
             self.history['cured'].append(int(self.R))
 
             if self.I > self.max_infected:
