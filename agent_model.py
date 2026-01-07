@@ -1,7 +1,8 @@
 import json
+import random
 from dataclasses import dataclass, field
 from enum import Enum, auto
-from utils import singleton
+from utils import Utils
 
 with open('data/school/classes.json', 'r', encoding='UTF-8') as f:
     SCHOOL_CONFIG = json.load(f)
@@ -13,7 +14,7 @@ class HealthState(Enum):
     RECOVERED = auto()
     VACCINATED = auto()
 
-@singleton
+@Utils.singleton
 class Virus:
     _instance = None
     def __new__(cls):
@@ -41,6 +42,7 @@ class Person:
     id: int
     role: str
     age: int
+    class_id: int
 
     state: HealthState = HealthState.SUSCEPTIBLE
     immunity: Immunity = field(default_factory=Immunity)
@@ -109,3 +111,26 @@ class Population:
         self.teacher = []
         self.classes = {}
         self._next_id = 0
+
+    def _build_students(self):
+        for class_id, info in self.classes['classes'].items():
+            grade, size = info['grade'], info['size']
+
+            self.classes[class_id] = []
+            age_min, age_max = Utils.age_range_for_grade(grade)
+
+            for _ in range(size):
+                student = Person(
+                    id=self._next_id,
+                    role='student',
+                    age=random.randint(age_min, age_max)
+                )
+                student.class_id = class_id
+
+                self.students.append(student)
+                self.classes[class_id].append(student)
+
+                self._next_id += 1
+
+    def _build_teachers(self):
+        pass
