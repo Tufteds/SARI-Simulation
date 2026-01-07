@@ -4,7 +4,7 @@ import numpy as np
 import json
 from collections import defaultdict
 from abc import ABC, abstractmethod
-from utils import singleton
+from utils import singleton, Utils
 from dataclasses import dataclass
 
 @dataclass
@@ -212,38 +212,61 @@ class MathematicalModel(BaseModel):
         self.history = {'healthy': [], 'vaccinated': [], 'exposed': [], 'infected': [], 'cured': []}
         self.peak_day = 0
         self.max_infected = 0
+        self.history_file = "data/simulation_history.json"
 
         # SEIRS параметры
-        self.beta = 0.3
+        self.beta = 0.2
         self.epsilon = 0.3
-        self.vaccination_rate = 0.001
+        self.vaccination_rate = 0.1
         self.omega_v = 1/180
-        self.sigma = 1 / 2
-        self.gamma = 1 / 6
+        self.sigma = 1 / 1.5
+        self.gamma = 1 / 7
         self.T_immunity = 90
         self.delta = 1 / self.T_immunity
 
         initial_exposed = round(population_size * 0.03)
-        initial_infected = round(population_size * 0.02)
-        self.S = population_size - initial_infected - initial_exposed
+        initial_infected = round(population_size * 0.05)
         self.V = 0
+        self.S = population_size - initial_infected - initial_exposed - self.V
         self.E = initial_exposed
         self.I = initial_infected
         self.R = 0
 
     def run(self, log_callback):
+        with open(self.history_file, "w", encoding="utf-8") as f:
+            json.dump({}, f)
+
         for day in range(self.days):
-            new_exposed = self.beta * self.S * self.I / self.population_size
-            new_vaccinations = self.vaccination_rate * self.S
-            infected_vaccinated = self.epsilon * self.beta * self.V * self.I / self.population_size
+            k = Utils.activity_factor(day)
+            season = Utils.is_season_peak(day)
+
+            if season > 1.4:
+                new_vaccinations = self.vaccination_rate * self.S
+                imported_exposed = 1
+            else:
+                new_vaccinations = 0
+                imported_exposed = np.random.poisson(2 + season)
+
+            if day <= self.peak_day:
+                effective_gamma = self.gamma
+                effective_beta = self.beta
+            elif day - self.peak_day >= 3:
+                effective_gamma = self.gamma * 1.15
+                effective_beta = self.beta * 0.35
+            else:
+                effective_gamma = self.gamma * 1.1
+                effective_beta = self.beta * k
+
+            new_exposed = effective_beta* self.S * self.I *k / self.population_size
+            infected_vaccinated = self.epsilon * effective_beta * k * self.V * self.I / self.population_size
             lost_immunity_v = self.omega_v * self.V
             new_infected = self.sigma * self.E
-            new_recovered = self.gamma * self.I
+            new_recovered = effective_gamma * self.I
             back_to_susceptible = self.delta * self.R
 
             self.S += back_to_susceptible - new_exposed - new_vaccinations + lost_immunity_v
             self.V += new_vaccinations - infected_vaccinated - lost_immunity_v
-            self.E += new_exposed - new_infected - infected_vaccinated
+            self.E += new_exposed + infected_vaccinated - new_infected + imported_exposed
             self.I += new_infected - new_recovered
             self.R += new_recovered - back_to_susceptible
 
@@ -252,6 +275,7 @@ class MathematicalModel(BaseModel):
             self.E = max(self.E, 0)
             self.I = max(self.I, 0)
             self.R = max(self.R, 0)
+
 
             self.history['healthy'].append(int(self.S))
             self.history['vaccinated'].append(int(self.V))
@@ -269,7 +293,30 @@ class MathematicalModel(BaseModel):
                 f"Заражённые: {int(self.I)}, Вылеченные: {int(self.R)}"
             )
 
-            log_callback(f"Новые заражённые: {int(new_exposed)}")
+            log_callback(f"Новые заражённые: {int(new_infected)}")
+
+            result = {
+                "meta": {
+                    "population_size": self.population_size,
+                    "days": self.days,
+                    "peak_day": self.peak_day + 1,
+                    "max_infected": self.max_infected,
+                },
+                "parameters": {
+                    "beta": self.beta,
+                    "epsilon": self.epsilon,
+                    "vaccination_rate": self.vaccination_rate,
+                    "omega_v": self.omega_v,
+                    "sigma": self.sigma,
+                    "gamma": self.gamma,
+                    "T_immunity": self.T_immunity,
+                    "delta": self.delta
+                },
+                "history": self.history
+            }
+
+            with open(self.history_file, "w", encoding="utf-8") as f:
+                json.dump(result, f, ensure_ascii=False, indent=4)
 
         return self.history
 
