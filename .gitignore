@@ -14,5 +14,6 @@ Thumbs.db
 *.png
 *.spec
 *.json
+data/simulation_history.json
 versions/
 script.py
