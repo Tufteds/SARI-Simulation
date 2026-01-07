@@ -1,6 +1,10 @@
+import json
 from dataclasses import dataclass, field
 from enum import Enum, auto
 from utils import singleton
+
+with open('data/school/classes.json', 'r', encoding='UTF-8') as f:
+    SCHOOL_CONFIG = json.load(f)
 
 class HealthState(Enum):
     SUSCEPTIBLE = auto()
@@ -39,7 +43,7 @@ class Person:
     age: int
 
     state: HealthState = HealthState.SUSCEPTIBLE
-    immunity = Immunity()
+    immunity: Immunity = field(default_factory=Immunity)
 
     days_infected: int = 0
     days_exposed: int = 0
@@ -63,6 +67,18 @@ class Person:
             self.state = HealthState.EXPOSED
             self.days_exposed = 0
 
+    def vaccinate(self):
+        self.state = HealthState.VACCINATED
+        self.days_since_vaccination = 0
+        self.immunity.antibody_level = min(
+            1.0,
+            self.immunity.antibody_level + 0.5
+        )
+        self.immunity.memory_strength = min(
+            1.0,
+            self.immunity.memory_strength + 0.3
+        )
+
     def update(self):
         if self.state == HealthState.EXPOSED:
             self.days_exposed += 1
@@ -75,12 +91,21 @@ class Person:
             if self.days_infected >= self.infectious_period:
                 self.state = HealthState.RECOVERED
                 self.days_since_recovery = 0
-                self.immunity = min(1.0, self.immunity + 0.6)
+                self.immunity.antibody_level = min(1.0, self.immunity.antibody_level + 0.6)
 
         elif self.state == HealthState.RECOVERED:
             self.days_since_recovery += 1
-            self.immunity *= 0.995
+            self.immunity.antibody_level *= 0.995
+            self.immunity.memory_strength *= (1 - self.immunity.memory_decay_rate)
 
         elif self.state == HealthState.VACCINATED:
             self.days_since_vaccination += 1
-            self.immunity *= 0.998
+            self.immunity.antibody_level *= 0.998
+
+class Population:
+    def __init__(self, config=SCHOOL_CONFIG):
+        self.config = config
+        self.students = []
+        self.teacher = []
+        self.classes = {}
+        self._next_id = 0
