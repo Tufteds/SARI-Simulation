@@ -245,3 +245,17 @@ class Population:
 
         if random.random() < p:
             target.exposed()
+
+    def step_day(self):
+        infected_people = [
+            p for p in self.students + self.teachers if p.is_infectious
+        ]
+
+        for source in infected_people:
+            contacts = self.get_daily_contacts(source)
+
+            for target in contacts:
+                self.try_infect(source, target)
+
+        for person in self.students + self.teachers:
+            person.update()
