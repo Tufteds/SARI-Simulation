@@ -2,7 +2,7 @@ import json
 import random
 from dataclasses import dataclass, field
 from enum import Enum, auto
-from utils import Utils
+from utils import Utils, singleton
 
 with open('data/school/classes.json', 'r', encoding='UTF-8') as f:
     SCHOOL_CONFIG = json.load(f)
@@ -14,7 +14,7 @@ class HealthState(Enum):
     RECOVERED = auto()
     VACCINATED = auto()
 
-@Utils.singleton
+@singleton
 class Virus:
     _instance = None
     def __new__(cls):
@@ -42,7 +42,8 @@ class Person:
     id: int
     role: str
     age: int
-    class_id: int
+    class_id: str | None = None
+    is_homeroom: bool = False
 
     state: HealthState = HealthState.SUSCEPTIBLE
     immunity: Immunity = field(default_factory=Immunity)
@@ -108,12 +109,15 @@ class Population:
     def __init__(self, config=SCHOOL_CONFIG):
         self.config = config
         self.students = []
-        self.teacher = []
+        self.teachers = []
         self.classes = {}
         self._next_id = 0
 
+        self._build_students()
+        self._build_teachers()
+
     def _build_students(self):
-        for class_id, info in self.classes['classes'].items():
+        for class_id, info in self.config['classes'].items():
             grade, size = info['grade'], info['size']
 
             self.classes[class_id] = []
@@ -123,7 +127,7 @@ class Population:
                 student = Person(
                     id=self._next_id,
                     role='student',
-                    age=random.randint(age_min, age_max)
+                    age=random.randint(age_min, age_max),
                 )
                 student.class_id = class_id
 
@@ -133,4 +137,29 @@ class Population:
                 self._next_id += 1
 
     def _build_teachers(self):
-        pass
+        for class_id in self.classes:
+            teacher = Person(
+                id=self._next_id,
+                role='teacher',
+                age=random.randint(30, 60),
+            )
+            teacher.class_id = class_id
+            teacher.is_homeroom = True
+
+            self.teachers.append(teacher)
+            self._next_id += 1
+
+        total_staff = self.config.get("teachers_per_class", 63)
+        max_teachers = 40
+        current = len(self.teachers)
+
+        n_additional = max(0, min(max_teachers - current, total_staff - current))
+
+        for _ in range(n_additional):
+            teacher = Person(
+                id = self._next_id,
+                role='teacher',
+                age=random.randint(30, 60),
+            )
+            self.teachers.append(teacher)
+            self._next_id += 1
