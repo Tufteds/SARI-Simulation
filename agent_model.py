@@ -199,6 +199,22 @@ class Population:
                 if t.is_homeroom and t.class_id == person.class_id:
                     contacts.add(t)
 
-        subject_teachers = [t for t in self.teachers if not t.is_homeroom]
-        contacts.update(random.sample(subject_teachers, k=min(3, len(subject_teachers))))
+            subject_teachers = [t for t in self.teachers if not t.is_homeroom]
+            contacts.update(random.sample(subject_teachers, k=min(3, len(subject_teachers))))
+
+        elif person.role == 'teacher':
+            if person.is_homeroom:
+                contacts.update(self.classes[person.class_id])
+
+            other_classes = random.sample(
+                list(self.classes.values()),
+                k=min(3, len(self.classes))
+            )
+            for cls in other_classes:
+                contacts.update(cls)
+
+            other_teachers = [t for t in self.teachers if t.id != person.id]
+            contacts.update(random.sample(other_teachers, k=min(3, len(other_teachers))))
+
+        contacts.discard(person)
         return list(contacts)
