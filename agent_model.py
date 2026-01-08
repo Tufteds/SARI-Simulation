@@ -13,6 +13,17 @@ class HealthState(Enum):
     INFECTED = auto()
     RECOVERED = auto()
     VACCINATED = auto()
+    AGE_SUSCEPTIBILITY = {
+        "child": 1.2,
+        "teen": 1.0,
+        "adult": 0.9,
+    }
+
+    ROLE_INFECTIVITY = {
+        "student": 1.0,
+        "teacher": 1.1,
+    }
+
 
 @singleton
 class Virus:
@@ -104,6 +115,12 @@ class Person:
         elif self.state == HealthState.VACCINATED:
             self.days_since_vaccination += 1
             self.immunity.antibody_level *= 0.998
+    def age_group(self):
+        if self.age <= 10:
+            return 'child'
+        elif self.age <= 18:
+            return 'teen'
+        return 'adult'
 
 class Population:
     def __init__(self, config=SCHOOL_CONFIG):
