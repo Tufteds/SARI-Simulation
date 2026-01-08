@@ -76,7 +76,7 @@ class Person:
     infectious_period: int = 7
 
     def is_infectious(self) -> bool:
-        return self.state ==  HealthState.INFECTED
+        return self.state == HealthState.INFECTED
 
     def can_be_infected(self) -> bool:
         return self.state in (
@@ -218,3 +218,30 @@ class Population:
 
         contacts.discard(person)
         return list(contacts)
+
+    def try_infect(self, source: Person, target: Person):
+        if not source.is_infectious():
+            return
+
+        if not target.can_be_infected():
+            return
+
+        beta = virus.infection_probability
+
+        w = Parameters.CONTACT_WEIGHT.value.get(
+            (source.role, target.role), 1.0
+        )
+
+        s = Parameters.AGE_SUSCEPTIBILITY.value[target.age_group()]
+        i = Parameters.ROLE_INFECTIVITY.value[source.role]
+
+        immunity_factor = 1 - (
+                target.immunity.antibody_level * 0.7 +
+                target.immunity.innate_strength * 0.3
+        )
+
+        p = beta * w * s * i * immunity_factor
+        p = min(max(p, 0.0), 0.95)
+
+        if random.random() < p:
+            target.exposed()
