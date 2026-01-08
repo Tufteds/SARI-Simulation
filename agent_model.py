@@ -13,6 +13,8 @@ class HealthState(Enum):
     INFECTED = auto()
     RECOVERED = auto()
     VACCINATED = auto()
+
+class Parameters(Enum):
     AGE_SUSCEPTIBILITY = {
         "child": 1.2,
         "teen": 1.0,
@@ -24,6 +26,12 @@ class HealthState(Enum):
         "teacher": 1.1,
     }
 
+    CONTACT_WEIGHT = {
+        ("student", "student"): 1.0,
+        ("student", "teacher"): 1.3,
+        ("teacher", "student"): 1.3,
+        ("teacher", "teacher"): 0.7,
+    }
 
 @singleton
 class Virus:
@@ -180,3 +188,17 @@ class Population:
             )
             self.teachers.append(teacher)
             self._next_id += 1
+
+    def get_daily_contacts(self, person: Person) -> list:
+        contacts = set()
+
+        if person.role == 'student':
+            contacts.update(self.classes[person.class_id])
+
+            for t in self.teachers:
+                if t.is_homeroom and t.class_id == person.class_id:
+                    contacts.add(t)
+
+        subject_teachers = [t for t in self.teachers if not t.is_homeroom]
+        contacts.update(random.sample(subject_teachers, k=min(3, len(subject_teachers))))
+        return list(contacts)
