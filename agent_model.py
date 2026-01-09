@@ -35,26 +35,23 @@ class Parameters(Enum):
 
 @singleton
 class Virus:
-    _instance = None
     def __new__(cls):
-        if cls._instance is None:
-            cls._instance = super().__new__(cls)
-            cls._instance.type = 'ОРВИ'
-            cls._instance.time_incubation = 2
-            cls._instance.base_duration = 7
-            cls._instance.infection_probability = 0.12
-        return cls._instance
+        obj = super().__new__(cls)
+        obj.type = "ОРВИ"
+        obj.time_incubation = 2
+        obj.base_duration = 7
+        obj.infection_probability = 0.08   # ↓ чтобы не вымирали за 10 дней
+        return obj
+
 
 virus = Virus()
 
 @dataclass
 class Immunity:
-    innate_strength: float = 0.5        # врожденная устойчивость (0–1)
-    adaptive_delay: int = 3             # дней до появления антител
-    antibody_level: float = 0.0         # текущий уровень антител (0–1)
-    memory_strength: float = 0.0        # иммунная память (0–1)
-    memory_decay_rate: float = 0.01     # спад памяти
-    immunocompromised: bool = False
+    innate_strength: float = 0.5
+    antibody_level: float = 0.0
+    memory_strength: float = 0.0
+    memory_decay_rate: float = 0.005
 
 @dataclass
 class Person:
@@ -67,18 +64,27 @@ class Person:
     state: HealthState = HealthState.SUSCEPTIBLE
     immunity: Immunity = field(default_factory=Immunity)
 
-    days_infected: int = 0
     days_exposed: int = 0
-    days_since_vaccination: int = 0
+    days_infected: int = 0
     days_since_recovery: int = 0
+    days_since_vaccination: int = 0
 
     incubation_period: int = 2
     infectious_period: int = 7
 
-    def is_infectious(self) -> bool:
+    # ---------
+
+    def age_group(self):
+        if self.age <= 10:
+            return "child"
+        elif self.age <= 18:
+            return "teen"
+        return "adult"
+
+    def is_infectious(self):
         return self.state == HealthState.INFECTED
 
-    def can_be_infected(self) -> bool:
+    def can_be_infected(self):
         return self.state in (
             HealthState.SUSCEPTIBLE,
             HealthState.VACCINATED
@@ -92,14 +98,10 @@ class Person:
     def vaccinate(self):
         self.state = HealthState.VACCINATED
         self.days_since_vaccination = 0
-        self.immunity.antibody_level = min(
-            1.0,
-            self.immunity.antibody_level + 0.5
-        )
-        self.immunity.memory_strength = min(
-            1.0,
-            self.immunity.memory_strength + 0.3
-        )
+        self.immunity.antibody_level = min(1.0, self.immunity.antibody_level + 0.6)
+        self.immunity.memory_strength = min(1.0, self.immunity.memory_strength + 0.4)
+
+    # ---------
 
     def update(self):
         if self.state == HealthState.EXPOSED:
@@ -113,22 +115,28 @@ class Person:
             if self.days_infected >= self.infectious_period:
                 self.state = HealthState.RECOVERED
                 self.days_since_recovery = 0
-                self.immunity.antibody_level = min(1.0, self.immunity.antibody_level + 0.6)
+                self.immunity.antibody_level = min(1.0, self.immunity.antibody_level + 0.7)
+                self.immunity.memory_strength = min(1.0, self.immunity.memory_strength + 0.5)
 
         elif self.state == HealthState.RECOVERED:
             self.days_since_recovery += 1
-            self.immunity.antibody_level *= 0.995
+
+            # экспоненциальный спад
+            self.immunity.antibody_level *= 0.97
             self.immunity.memory_strength *= (1 - self.immunity.memory_decay_rate)
+
+            if self.immunity.antibody_level < 0.2:
+                self.state = HealthState.SUSCEPTIBLE
+                self.days_since_recovery = 0
 
         elif self.state == HealthState.VACCINATED:
             self.days_since_vaccination += 1
-            self.immunity.antibody_level *= 0.998
-    def age_group(self):
-        if self.age <= 10:
-            return 'child'
-        elif self.age <= 18:
-            return 'teen'
-        return 'adult'
+            self.immunity.antibody_level *= 0.985
+
+
+# =========================
+# POPULATION
+# =========================
 
 class Population:
     def __init__(self, config=SCHOOL_CONFIG):
@@ -141,121 +149,131 @@ class Population:
         self._build_students()
         self._build_teachers()
 
-    def _build_students(self):
-        for class_id, info in self.config['classes'].items():
-            grade, size = info['grade'], info['size']
+    # ---------
 
+    def _build_students(self):
+        for class_id, info in self.config["classes"].items():
+            grade, size = info["grade"], info["size"]
             self.classes[class_id] = []
+
             age_min, age_max = Utils.age_range_for_grade(grade)
 
             for _ in range(size):
-                student = Person(
+                s = Person(
                     id=self._next_id,
-                    role='student',
+                    role="student",
                     age=random.randint(age_min, age_max),
+                    class_id=class_id
                 )
-                student.class_id = class_id
-
-                self.students.append(student)
-                self.classes[class_id].append(student)
-
+                self.students.append(s)
+                self.classes[class_id].append(s)
                 self._next_id += 1
 
     def _build_teachers(self):
         for class_id in self.classes:
-            teacher = Person(
+            t = Person(
                 id=self._next_id,
-                role='teacher',
+                role="teacher",
                 age=random.randint(30, 60),
+                class_id=class_id,
+                is_homeroom=True
             )
-            teacher.class_id = class_id
-            teacher.is_homeroom = True
-
-            self.teachers.append(teacher)
+            self.teachers.append(t)
             self._next_id += 1
 
-        total_staff = self.config.get("teachers_per_class", 63)
-        max_teachers = 40
-        current = len(self.teachers)
-
-        n_additional = max(0, min(max_teachers - current, total_staff - current))
-
-        for _ in range(n_additional):
-            teacher = Person(
-                id = self._next_id,
-                role='teacher',
-                age=random.randint(30, 60),
+        for _ in range(30):
+            t = Person(
+                id=self._next_id,
+                role="teacher",
+                age=random.randint(30, 60)
             )
-            self.teachers.append(teacher)
+            self.teachers.append(t)
             self._next_id += 1
 
-    def get_daily_contacts(self, person: Person) -> list:
-        contacts = set()
+    # ---------
 
-        if person.role == 'student':
-            contacts.update(self.classes[person.class_id])
+    def get_daily_contacts(self, person: Person):
+        contacts = []
+
+        if person.role == "student":
+            contacts.extend(self.classes[person.class_id])
 
             for t in self.teachers:
                 if t.is_homeroom and t.class_id == person.class_id:
-                    contacts.add(t)
+                    contacts.append(t)
 
-            subject_teachers = [t for t in self.teachers if not t.is_homeroom]
-            contacts.update(random.sample(subject_teachers, k=min(3, len(subject_teachers))))
+            others = [t for t in self.teachers if not t.is_homeroom]
+            contacts.extend(random.sample(others, min(2, len(others))))
 
-        elif person.role == 'teacher':
+        else:
             if person.is_homeroom:
-                contacts.update(self.classes[person.class_id])
+                contacts.extend(self.classes[person.class_id])
 
-            other_classes = random.sample(
-                list(self.classes.values()),
-                k=min(3, len(self.classes))
-            )
-            for cls in other_classes:
-                contacts.update(cls)
+            for cls in random.sample(list(self.classes.values()), min(2, len(self.classes))):
+                contacts.extend(cls)
 
-            other_teachers = [t for t in self.teachers if t.id != person.id]
-            contacts.update(random.sample(other_teachers, k=min(3, len(other_teachers))))
-
-        contacts.discard(person)
-        return list(contacts)
+        return contacts
 
     def try_infect(self, source: Person, target: Person):
         if not source.is_infectious():
             return
-
         if not target.can_be_infected():
             return
 
         beta = virus.infection_probability
-
-        w = Parameters.CONTACT_WEIGHT.value.get(
-            (source.role, target.role), 1.0
-        )
-
+        w = Parameters.CONTACT_WEIGHT.value[(source.role, target.role)]
         s = Parameters.AGE_SUSCEPTIBILITY.value[target.age_group()]
         i = Parameters.ROLE_INFECTIVITY.value[source.role]
 
         immunity_factor = 1 - (
-                target.immunity.antibody_level * 0.7 +
-                target.immunity.innate_strength * 0.3
+            target.immunity.antibody_level * 0.7 +
+            target.immunity.memory_strength * 0.3
         )
 
         p = beta * w * s * i * immunity_factor
-        p = min(max(p, 0.0), 0.95)
+        p = max(0.0, min(p, 0.9))
 
         if random.random() < p:
             target.exposed()
 
     def step_day(self):
-        infected_people = [
-            p for p in self.students + self.teachers if p.is_infectious
+        infected = [p for p in self.students + self.teachers if p.is_infectious()]
+
+        for source in infected:
+            for target in self.get_daily_contacts(source):
+                if target.id != source.id:
+                    self.try_infect(source, target)
+
+        for p in self.students + self.teachers:
+            p.update()
+
+        all_p = self.students + self.teachers
+        return {
+            "S": sum(p.state == HealthState.SUSCEPTIBLE for p in all_p),
+            "E": sum(p.state == HealthState.EXPOSED for p in all_p),
+            "I": sum(p.state == HealthState.INFECTED for p in all_p),
+            "R": sum(p.state == HealthState.RECOVERED for p in all_p),
+            "V": sum(p.state == HealthState.VACCINATED for p in all_p),
+        }
+
+    def vaccinate_population(self, rate=0.5):
+        susceptible = [
+            p for p in self.students + self.teachers
+            if p.state == HealthState.SUSCEPTIBLE
         ]
+        for p in random.sample(susceptible, int(len(susceptible) * rate)):
+            p.vaccinate()
 
-        for source in infected_people:
-            contacts = self.get_daily_contacts(source)
+pop = Population()
 
-            for target in contacts:
-                self.try_infect(source, target)
+random.choice(pop.students).state = HealthState.INFECTED
 
-        for person in self.students + self.teachers:
-            person.update()
+history = []
+
+for day in range(60):
+    if day == 30:
+        pop.vaccinate_population(rate=0.6)
+
+    stats = pop.step_day()
+    history.append(stats)
+    print(f"Day {day}: {stats}")
