@@ -33,3 +33,18 @@ class Utils():
     @staticmethod
     def is_season_peak(day):
         return 1.0 + 0.6 * math.sin(2 * math.pi * day / 365)
+    @staticmethod
+    def age_range_for_grade(grade):
+        return {
+            1: (6, 7),
+            2: (7, 8),
+            3: (8, 9),
+            4: (9, 10),
+            5: (10, 11),
+            6: (11, 12),
+            7: (12, 13),
+            8: (13, 14),
+            9: (14, 16),
+            10: (15, 17),
+            11: (16, 18),
+        }[grade]

@@ -1,12 +1,11 @@
-# Начальные модули
-import random
-import numpy as np
 import json
-from collections import defaultdict
-from abc import ABC, abstractmethod
-from utils import singleton, Utils
+import random
 from dataclasses import dataclass, field
 from enum import Enum, auto
+from utils import Utils, singleton
+
+with open('data/school/classes.json', 'r', encoding='UTF-8') as f:
+    SCHOOL_CONFIG = json.load(f)
 
 class HealthState(Enum):
     SUSCEPTIBLE = auto()
@@ -34,18 +33,6 @@ class Parameters(Enum):
         ("teacher", "teacher"): 0.7,
     }
 
-@dataclass
-class Immunity:
-    innate_strength: float = 0.5        # врожденная устойчивость (0–1)
-    adaptive_delay: int = 3             # дней до появления антител
-    antibody_level: float = 0.0         # текущий уровень антител (0–1)
-    memory_strength: float = 0.0        # иммунная память (0–1)
-    memory_decay_rate: float = 0.01     # спад памяти
-    immunocompromised: bool = False     # слабый иммунитет
-
-with open('data/school/classes.json', 'r', encoding='UTF-8') as f:
-    SCHOOL_CONFIG = json.load(f)
-
 @singleton
 class Virus:
     def __new__(cls):
@@ -55,7 +42,16 @@ class Virus:
         obj.base_duration = 7
         obj.infection_probability = 0.02  # ↓ чтобы не вымирали за 10 дней
         return obj
+
+
 virus = Virus()
+
+@dataclass
+class Immunity:
+    innate_strength: float = 0.5
+    antibody_level: float = 0.0
+    memory_strength: float = 0.0
+    memory_decay_rate: float = 0.005
 
 @dataclass
 class Person:
@@ -131,12 +127,16 @@ class Person:
 
             if self.immunity.antibody_level < 0.2:
                 self.state = HealthState.SUSCEPTIBLE
-                self.days_since_recovery = 0
+                self.days_since_recovery = 00
 
         elif self.state == HealthState.VACCINATED:
             self.days_since_vaccination += 1
             self.immunity.antibody_level *= 0.985
 
+
+# =========================
+# POPULATION
+# =========================
 
 class Population:
     def __init__(self, config=SCHOOL_CONFIG):
@@ -276,182 +276,17 @@ class Population:
         for p in random.sample(susceptible, int(len(susceptible) * rate)):
             p.vaccinate()
 
+pop = Population()
 
-class BaseModel(ABC):
-    def __init__(self, population_size, days):
-        self.population_size = population_size
-        self.days = days
-        self.history = {}
+for _ in range(5):
+    random.choice(pop.students).state = HealthState.INFECTED
 
-    @abstractmethod
-    def run(self, log_callback):
-        pass
+history = []
 
-class AgentBasedModel(BaseModel):
-    def __init__(self, population_size, days):
-        super().__init__(population_size, days)
-        self.population = Population()
-        self.history = {'healthy': [], 'vaccinated': [], 'exposed': [], 'infected': [], 'cured': []}
-        self.peak_day = 0
-        self.max_infected = 0
-        for _ in range(5):
-            random.choice(self.population.students).state = HealthState.INFECTED
+for day in range(320):
+    if day == 90:
+        pop.vaccinate_population(rate=0.6)
 
-    def run(self, log_callback):
-        for day in range(self.days):
-            stats = self.population.step_day()
-
-            S = stats["S"]
-            E = stats["E"]
-            I = stats["I"]
-            R = stats["R"]
-            V = stats["V"]
-
-            self.history['healthy'].append(S)
-            self.history['vaccinated'].append(V)
-            self.history['exposed'].append(E)
-            self.history['infected'].append(I)
-            self.history['cured'].append(R)
-
-            if I > self.max_infected:
-                self.max_infected = I
-                self.peak_day = day
-
-            log_callback(f"--- День {day + 1} ---")
-            log_callback(
-                f"Здоровые: {S}, Вакцинированные: {V}, "
-                f"Подверженные: {E}, Заражённые: {I}, Вылеченные: {R}"
-            )
-
-            # раннее завершение, если эпидемия закончилась
-            if I == 0 and E == 0:
-                log_callback("Симуляция завершена.")
-                break
-
-        return self.history
-
-class MathematicalModel(BaseModel):
-    def __init__(self, population_size, days):
-        super().__init__(population_size, days)
-        self.history = {'healthy': [], 'vaccinated': [], 'exposed': [], 'infected': [], 'cured': []}
-        self.peak_day = 0
-        self.max_infected = 0
-        self.history_file = "data/simulation_history.json"
-
-        # SEIRS параметры
-        self.beta = 0.2
-        self.epsilon = 0.3
-        self.vaccination_rate = 0.1
-        self.omega_v = 1/180
-        self.sigma = 1 / 1.5
-        self.gamma = 1 / 7
-        self.T_immunity = 90
-        self.delta = 1 / self.T_immunity
-
-        initial_exposed = round(population_size * 0.03)
-        initial_infected = round(population_size * 0.05)
-        self.V = 0
-        self.S = population_size - initial_infected - initial_exposed - self.V
-        self.E = initial_exposed
-        self.I = initial_infected
-        self.R = 0
-
-    def seasonal_factor(self, day):
-        year = 365
-        return (
-                1
-                + 0.35 * np.sin(2 * np.pi * day / year)
-                + 0.20 * np.sin(4 * np.pi * day / year)
-        )
-
-    def vaccination_campaign(self, day):
-        """
-        Импульсная вакцинация: 2 кампании в год
-        """
-        start, end = 90, 120
-        if start <= day <= end:
-                return 0.05  # 5% от S в день
-        return 0.0
-
-    def run(self, log_callback):
-        with open(self.history_file, "w", encoding="utf-8") as f:
-            json.dump({}, f)
-
-        for day in range(self.days):
-            activity_factor = Utils.activity_factor(day)
-            season_factor = self.seasonal_factor(day)
-
-            vacc_rate_today = self.vaccination_campaign(day)
-            new_vaccinations = vacc_rate_today * self.S
-
-            effective_beta = self.beta * season_factor * activity_factor
-            effective_gamma = self.gamma
-            imported_exposed = 0.3 * season_factor
-
-            new_exposed = effective_beta * self.S * self.I / self.population_size
-            infected_vaccinated = self.epsilon * effective_beta * self.V * self.I / self.population_size
-            lost_immunity_v = self.omega_v * self.V
-            new_infected = self.sigma * self.E
-            new_recovered = effective_gamma * self.I
-            back_to_susceptible = self.delta * self.R
-
-            self.S += back_to_susceptible - new_exposed - new_vaccinations + lost_immunity_v
-            self.V += new_vaccinations - infected_vaccinated - lost_immunity_v
-            self.E += new_exposed + infected_vaccinated - new_infected + imported_exposed
-            self.I += new_infected - new_recovered
-            self.R += new_recovered - back_to_susceptible
-
-            self.S = max(self.S, 0)
-            self.V = max(self.V, 0)
-            self.E = max(self.E, 0)
-            self.I = max(self.I, 0)
-            self.R = max(self.R, 0)
-
-
-            self.history['healthy'].append(int(self.S))
-            self.history['vaccinated'].append(int(self.V))
-            self.history['exposed'].append(int(self.E))
-            self.history['infected'].append(int(self.I))
-            self.history['cured'].append(int(self.R))
-
-            if self.I > self.max_infected:
-                self.max_infected = int(self.I)
-                self.peak_day = day
-
-            log_callback(f"--- День {day+1} ---")
-            log_callback(
-                f"Здоровые: {int(self.S)}, Вакцинированные: {int(self.V)}, Подверженные: {int(self.E)}, "
-                f"Заражённые: {int(self.I)}, Вылеченные: {int(self.R)}"
-            )
-
-            log_callback(f"Новые заражённые: {int(new_infected)}")
-
-            result = {
-                "meta": {
-                    "population_size": self.population_size,
-                    "days": self.days,
-                    "peak_day": self.peak_day + 1,
-                    "max_infected": self.max_infected,
-                },
-                "parameters": {
-                    "beta": self.beta,
-                    "epsilon": self.epsilon,
-                    "vaccination_rate": self.vaccination_rate,
-                    "omega_v": self.omega_v,
-                    "sigma": self.sigma,
-                    "gamma": self.gamma,
-                    "T_immunity": self.T_immunity,
-                    "delta": self.delta
-                },
-                "history": self.history
-            }
-
-            with open(self.history_file, "w", encoding="utf-8") as f:
-                json.dump(result, f, ensure_ascii=False, indent=4)
-
-        return self.history
-
-class HybrydModel(BaseModel):
-    def run(self, log_callback):
-        log_callback("Гибридная модель пока не реализована.")
-        return {'healthy': [], 'exposed': [], 'infected': [], 'cured': []}
+    stats = pop.step_day()
+    history.append(stats)
+    print(f"Day {day}: {stats}")
