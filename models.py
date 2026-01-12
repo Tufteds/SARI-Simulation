@@ -232,33 +232,40 @@ class MathematicalModel(BaseModel):
         self.I = initial_infected
         self.R = 0
 
+    def seasonal_factor(self, day):
+        year = 365
+        return (
+                1
+                + 0.35 * np.sin(2 * np.pi * day / year)
+                + 0.20 * np.sin(4 * np.pi * day / year)
+        )
+
+    def vaccination_campaign(self, day):
+        """
+        Импульсная вакцинация: 2 кампании в год
+        """
+        start, end = 90, 120
+        if start <= day <= end:
+                return 0.05  # 5% от S в день
+        return 0.0
+
     def run(self, log_callback):
         with open(self.history_file, "w", encoding="utf-8") as f:
             json.dump({}, f)
 
         for day in range(self.days):
-            k = Utils.activity_factor(day)
-            season = Utils.is_season_peak(day)
+            activity_factor = Utils.activity_factor(day)
+            season_factor = self.seasonal_factor(day)
 
-            if season > 1.4:
-                new_vaccinations = self.vaccination_rate * self.S
-                imported_exposed = 1
-            else:
-                new_vaccinations = 0
-                imported_exposed = np.random.poisson(2 + season)
+            vacc_rate_today = self.vaccination_campaign(day)
+            new_vaccinations = vacc_rate_today * self.S
 
-            if day <= self.peak_day:
-                effective_gamma = self.gamma
-                effective_beta = self.beta
-            elif day - self.peak_day >= 3:
-                effective_gamma = self.gamma * 1.15
-                effective_beta = self.beta * 0.35
-            else:
-                effective_gamma = self.gamma * 1.1
-                effective_beta = self.beta * k
+            effective_beta = self.beta * season_factor * activity_factor
+            effective_gamma = self.gamma
+            imported_exposed = 0.3 * season_factor
 
-            new_exposed = effective_beta* self.S * self.I *k / self.population_size
-            infected_vaccinated = self.epsilon * effective_beta * k * self.V * self.I / self.population_size
+            new_exposed = effective_beta * self.S * self.I / self.population_size
+            infected_vaccinated = self.epsilon * effective_beta * self.V * self.I / self.population_size
             lost_immunity_v = self.omega_v * self.V
             new_infected = self.sigma * self.E
             new_recovered = effective_gamma * self.I
