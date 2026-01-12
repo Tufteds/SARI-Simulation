@@ -40,7 +40,7 @@ class Virus:
         obj.type = "ОРВИ"
         obj.time_incubation = 2
         obj.base_duration = 7
-        obj.infection_probability = 0.08   # ↓ чтобы не вымирали за 10 дней
+        obj.infection_probability = 0.02  # ↓ чтобы не вымирали за 10 дней
         return obj
 
 
@@ -151,6 +151,14 @@ class Population:
 
     # ---------
 
+    def random_infections(self, chance=0.002):
+        """
+        chance — вероятность заражения каждого человека вне контактов
+        """
+        for p in self.students + self.teachers:
+            if p.can_be_infected() and random.random() < chance:
+                p.exposed()
+
     def _build_students(self):
         for class_id, info in self.config["classes"].items():
             grade, size = info["grade"], info["size"]
@@ -196,7 +204,7 @@ class Population:
         contacts = []
 
         if person.role == "student":
-            contacts.extend(self.classes[person.class_id])
+            contacts.extend(random.sample(self.classes[person.class_id], min(3, len(self.classes[person.class_id]))))
 
             for t in self.teachers:
                 if t.is_homeroom and t.class_id == person.class_id:
@@ -231,19 +239,23 @@ class Population:
         )
 
         p = beta * w * s * i * immunity_factor
+        p *= random.uniform(0.7, 1.0)  # немного случайности
         p = max(0.0, min(p, 0.9))
 
         if random.random() < p:
             target.exposed()
 
     def step_day(self):
-        infected = [p for p in self.students + self.teachers if p.is_infectious()]
+        self.random_infections(chance=0.002)  # можно подбирать под динамику
 
+        # 2) заражения через контакты
+        infected = [p for p in self.students + self.teachers if p.is_infectious()]
         for source in infected:
             for target in self.get_daily_contacts(source):
                 if target.id != source.id:
                     self.try_infect(source, target)
 
+        # 3) обновляем состояния
         for p in self.students + self.teachers:
             p.update()
 
@@ -254,7 +266,7 @@ class Population:
             "I": sum(p.state == HealthState.INFECTED for p in all_p),
             "R": sum(p.state == HealthState.RECOVERED for p in all_p),
             "V": sum(p.state == HealthState.VACCINATED for p in all_p),
-        }
+            }
 
     def vaccinate_population(self, rate=0.5):
         susceptible = [
@@ -266,12 +278,13 @@ class Population:
 
 pop = Population()
 
-random.choice(pop.students).state = HealthState.INFECTED
+for _ in range(5):
+    random.choice(pop.students).state = HealthState.INFECTED
 
 history = []
 
-for day in range(60):
-    if day == 30:
+for day in range(320):
+    if day == 90:
         pop.vaccinate_population(rate=0.6)
 
     stats = pop.step_day()
