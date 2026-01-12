@@ -5,7 +5,34 @@ import json
 from collections import defaultdict
 from abc import ABC, abstractmethod
 from utils import singleton, Utils
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from enum import Enum, auto
+
+class HealthState(Enum):
+    SUSCEPTIBLE = auto()
+    EXPOSED = auto()
+    INFECTED = auto()
+    RECOVERED = auto()
+    VACCINATED = auto()
+
+class Parameters(Enum):
+    AGE_SUSCEPTIBILITY = {
+        "child": 1.2,
+        "teen": 1.0,
+        "adult": 0.9,
+    }
+
+    ROLE_INFECTIVITY = {
+        "student": 1.0,
+        "teacher": 1.1,
+    }
+
+    CONTACT_WEIGHT = {
+        ("student", "student"): 1.0,
+        ("student", "teacher"): 1.3,
+        ("teacher", "student"): 1.3,
+        ("teacher", "teacher"): 0.7,
+    }
 
 @dataclass
 class Immunity:
@@ -16,137 +43,238 @@ class Immunity:
     memory_decay_rate: float = 0.01     # спад памяти
     immunocompromised: bool = False     # слабый иммунитет
 
-# Вирус в единственном экземпляре
+with open('data/school/classes.json', 'r', encoding='UTF-8') as f:
+    SCHOOL_CONFIG = json.load(f)
+
 @singleton
 class Virus:
-    _instance = None
     def __new__(cls):
-        if cls._instance is None:
-            cls._instance = super().__new__(cls)
-            cls._instance.type = 'ОРВИ'
-            cls._instance.time_incubation = 2
-            cls._instance.base_duration = 6
-            cls._instance.infection_probability = 0.12
-        return cls._instance
-
+        obj = super().__new__(cls)
+        obj.type = "ОРВИ"
+        obj.time_incubation = 2
+        obj.base_duration = 7
+        obj.infection_probability = 0.02  # ↓ чтобы не вымирали за 10 дней
+        return obj
 virus = Virus()
 
+@dataclass
 class Person:
-    def __init__(self):
-        self.status = 'healthy'
-        self.days_infected = 0
-        self.incubation = 0
-        self.immunity = Immunity()
-        self.vaccinated = False
-        self.days_since_vaccination = 0
-        self._cured_time = 0
+    id: int
+    role: str
+    age: int
+    class_id: str | None = None
+    is_homeroom: bool = False
 
-    # Логика обновления состояния и иммунитета
-    def update_infections(self):
-        # Обновляем иммунитет (антитела и память ослабевают)
-        self.immunity.antibody_level = max(0, self.immunity.antibody_level * 0.99)
-        self.immunity.memory_strength = max(
-            0, self.immunity.memory_strength * (1 - self.immunity.memory_decay_rate)
+    state: HealthState = HealthState.SUSCEPTIBLE
+    immunity: Immunity = field(default_factory=Immunity)
+
+    days_exposed: int = 0
+    days_infected: int = 0
+    days_since_recovery: int = 0
+    days_since_vaccination: int = 0
+
+    incubation_period: int = 2
+    infectious_period: int = 7
+
+    # ---------
+
+    def age_group(self):
+        if self.age <= 10:
+            return "child"
+        elif self.age <= 18:
+            return "teen"
+        return "adult"
+
+    def is_infectious(self):
+        return self.state == HealthState.INFECTED
+
+    def can_be_infected(self):
+        return self.state in (
+            HealthState.SUSCEPTIBLE,
+            HealthState.VACCINATED
         )
 
-        # Обработка вакцинации для ВСЕХ статусов (кроме infected)
-        if not self.vaccinated and self.status != 'infected' and random.random() < 0.001:
-            self.vaccinated = True
-            self._days_since_vaccination = 0
-            # Вакцинация повышает иммунитет, но не так сильно как болезнь
-            self.immunity.antibody_level = min(1.0, self.immunity.antibody_level + 0.3)
-            self.immunity.memory_strength = min(1.0, self.immunity.memory_strength + 0.15)
+    def exposed(self):
+        if self.can_be_infected():
+            self.state = HealthState.EXPOSED
+            self.days_exposed = 0
 
-        # Если вакцинирован, отслеживаем время
-        if self.vaccinated:
-            self._days_since_vaccination += 1
-            # Вакцинный иммунитет ослабевает через 180 дней (полгода)
-            if self._days_since_vaccination >= 180:
-                self.vaccinated = False
-                # Ослабление иммунитета при потере вакцинной защиты
-                self.immunity.antibody_level *= 0.7
-                self.immunity.memory_strength *= 0.8
+    def vaccinate(self):
+        self.state = HealthState.VACCINATED
+        self.days_since_vaccination = 0
+        self.immunity.antibody_level = min(1.0, self.immunity.antibody_level + 0.6)
+        self.immunity.memory_strength = min(1.0, self.immunity.memory_strength + 0.4)
 
-        # Логика болезни
-        if self.status == 'exposed':
-            self.incubation += 1
-
-            # адаптивный иммунитет начинает работать после задержки
-            if self.incubation >= self.immunity.adaptive_delay:
-                self.immunity.antibody_level += 0.02
-
-            # переход в инфекционную фазу
-            if self.incubation >= virus.time_incubation:
-                self.status = 'infected'
-
-        elif self.status == 'infected':
-            self.days_infected += 1
-
-            # активная выработка антител и рост памяти
-            self.immunity.antibody_level = min(1.0, self.immunity.antibody_level + 0.05)
-            self.immunity.memory_strength = min(1.0, self.immunity.memory_strength + 0.01)
-
-            # завершение болезни
-            if self.days_infected >= virus.base_duration:
-                self.status = 'cured'
-                self._cured_time = 10
-
-        elif self.status == 'cured':
-            self._cured_time -= 1
-            if self._cured_time <= 0:
-                self.status = 'healthy'
-                self.days_infected = 0
-                self.incubation = 0
-
-class Population:
-    def __init__(self, size, infected_count):
-        self.people = [Person() for _ in range(size)]
-        for person in random.sample(self.people, infected_count):
-            person.status = 'exposed'
+    # ---------
 
     def update(self):
-        groups = self.group_by_status()
-        new_infections = 0
+        if self.state == HealthState.EXPOSED:
+            self.days_exposed += 1
+            if self.days_exposed >= self.incubation_period:
+                self.state = HealthState.INFECTED
+                self.days_infected = 0
 
-        for person in self.people:
-            person.update_infections()
+        elif self.state == HealthState.INFECTED:
+            self.days_infected += 1
+            if self.days_infected >= self.infectious_period:
+                self.state = HealthState.RECOVERED
+                self.days_since_recovery = 0
+                self.immunity.antibody_level = min(1.0, self.immunity.antibody_level + 0.7)
+                self.immunity.memory_strength = min(1.0, self.immunity.memory_strength + 0.5)
 
-        infected_group = groups['infected']
-        exposed_group = groups['exposed']
-        healthy_group = groups['healthy']
+        elif self.state == HealthState.RECOVERED:
+            self.days_since_recovery += 1
 
-        if infected_group and healthy_group:
+            # экспоненциальный спад
+            self.immunity.antibody_level *= 0.97
+            self.immunity.memory_strength *= (1 - self.immunity.memory_decay_rate)
 
-            random.shuffle(healthy_group)
+            if self.immunity.antibody_level < 0.2:
+                self.state = HealthState.SUSCEPTIBLE
+                self.days_since_recovery = 0
 
-            infectious = infected_group + exposed_group
+        elif self.state == HealthState.VACCINATED:
+            self.days_since_vaccination += 1
+            self.immunity.antibody_level *= 0.985
 
-            for sick_person in infectious:
-                for _ in range(np.random.poisson(3)):
-                    if not healthy_group:
-                        break
-                    target = healthy_group.pop()
-                    chance = virus.infection_probability
-                    chance *= (1 - target.immunity.innate_strength)
-                    chance *= max(0.05, 1 - target.immunity.antibody_level)
-                    chance *= (1 - target.immunity.memory_strength)
 
-                    if target.immunity.immunocompromised:
-                        chance *= 1.5
+class Population:
+    def __init__(self, config=SCHOOL_CONFIG):
+        self.config = config
+        self.students = []
+        self.teachers = []
+        self.classes = {}
+        self._next_id = 0
 
-                    if random.random() < chance:
-                        target.status = 'exposed'
-                        target.incubation = 0
-                        new_infections += 1
+        self._build_students()
+        self._build_teachers()
 
-        return new_infections
+    # ---------
 
-    # группировка людей
-    def group_by_status(self):
-        groups = defaultdict(list)
-        for person in self.people:
-            groups[person.status].append(person)
-        return groups
+    def random_infections(self, chance=0.002):
+        """
+        chance — вероятность заражения каждого человека вне контактов
+        """
+        for p in self.students + self.teachers:
+            if p.can_be_infected() and random.random() < chance:
+                p.exposed()
+
+    def _build_students(self):
+        for class_id, info in self.config["classes"].items():
+            grade, size = info["grade"], info["size"]
+            self.classes[class_id] = []
+
+            age_min, age_max = Utils.age_range_for_grade(grade)
+
+            for _ in range(size):
+                s = Person(
+                    id=self._next_id,
+                    role="student",
+                    age=random.randint(age_min, age_max),
+                    class_id=class_id
+                )
+                self.students.append(s)
+                self.classes[class_id].append(s)
+                self._next_id += 1
+
+    def _build_teachers(self):
+        for class_id in self.classes:
+            t = Person(
+                id=self._next_id,
+                role="teacher",
+                age=random.randint(30, 60),
+                class_id=class_id,
+                is_homeroom=True
+            )
+            self.teachers.append(t)
+            self._next_id += 1
+
+        for _ in range(30):
+            t = Person(
+                id=self._next_id,
+                role="teacher",
+                age=random.randint(30, 60)
+            )
+            self.teachers.append(t)
+            self._next_id += 1
+
+    # ---------
+
+    def get_daily_contacts(self, person: Person):
+        contacts = []
+
+        if person.role == "student":
+            contacts.extend(random.sample(self.classes[person.class_id], min(3, len(self.classes[person.class_id]))))
+
+            for t in self.teachers:
+                if t.is_homeroom and t.class_id == person.class_id:
+                    contacts.append(t)
+
+            others = [t for t in self.teachers if not t.is_homeroom]
+            contacts.extend(random.sample(others, min(2, len(others))))
+
+        else:
+            if person.is_homeroom:
+                contacts.extend(self.classes[person.class_id])
+
+            for cls in random.sample(list(self.classes.values()), min(2, len(self.classes))):
+                contacts.extend(cls)
+
+        return contacts
+
+    def try_infect(self, source: Person, target: Person):
+        if not source.is_infectious():
+            return
+        if not target.can_be_infected():
+            return
+
+        beta = virus.infection_probability
+        w = Parameters.CONTACT_WEIGHT.value[(source.role, target.role)]
+        s = Parameters.AGE_SUSCEPTIBILITY.value[target.age_group()]
+        i = Parameters.ROLE_INFECTIVITY.value[source.role]
+
+        immunity_factor = 1 - (
+            target.immunity.antibody_level * 0.7 +
+            target.immunity.memory_strength * 0.3
+        )
+
+        p = beta * w * s * i * immunity_factor
+        p *= random.uniform(0.7, 1.0)  # немного случайности
+        p = max(0.0, min(p, 0.9))
+
+        if random.random() < p:
+            target.exposed()
+
+    def step_day(self):
+        self.random_infections(chance=0.002)  # можно подбирать под динамику
+
+        # 2) заражения через контакты
+        infected = [p for p in self.students + self.teachers if p.is_infectious()]
+        for source in infected:
+            for target in self.get_daily_contacts(source):
+                if target.id != source.id:
+                    self.try_infect(source, target)
+
+        # 3) обновляем состояния
+        for p in self.students + self.teachers:
+            p.update()
+
+        all_p = self.students + self.teachers
+        return {
+            "S": sum(p.state == HealthState.SUSCEPTIBLE for p in all_p),
+            "E": sum(p.state == HealthState.EXPOSED for p in all_p),
+            "I": sum(p.state == HealthState.INFECTED for p in all_p),
+            "R": sum(p.state == HealthState.RECOVERED for p in all_p),
+            "V": sum(p.state == HealthState.VACCINATED for p in all_p),
+            }
+
+    def vaccinate_population(self, rate=0.5):
+        susceptible = [
+            p for p in self.students + self.teachers
+            if p.state == HealthState.SUSCEPTIBLE
+        ]
+        for p in random.sample(susceptible, int(len(susceptible) * rate)):
+            p.vaccinate()
 
 
 class BaseModel(ABC):
@@ -162,47 +290,43 @@ class BaseModel(ABC):
 class AgentBasedModel(BaseModel):
     def __init__(self, population_size, days):
         super().__init__(population_size, days)
-        self.population = Population(population_size, round(population_size * 0.01))
+        self.population = Population()
         self.history = {'healthy': [], 'vaccinated': [], 'exposed': [], 'infected': [], 'cured': []}
         self.peak_day = 0
         self.max_infected = 0
+        for _ in range(5):
+            random.choice(self.population.students).state = HealthState.INFECTED
 
     def run(self, log_callback):
         for day in range(self.days):
-            # Получаем актуальные группы
-            groups = self.population.group_by_status()
-            healthy = len(groups.get('healthy', []))
-            exposed = len(groups.get('exposed', []))
-            infected = len(groups.get('infected', []))
-            cured = len(groups.get('cured', []))
+            stats = self.population.step_day()
 
-            # Подсчитываем вакцинированных отдельно
-            vaccinated_count = sum(1 for person in self.population.people
-                                   if person.vaccinated)
+            S = stats["S"]
+            E = stats["E"]
+            I = stats["I"]
+            R = stats["R"]
+            V = stats["V"]
 
-            self.history['healthy'].append(healthy)
-            self.history['vaccinated'].append(vaccinated_count)
-            self.history['exposed'].append(exposed)
-            self.history['infected'].append(infected)
-            self.history['cured'].append(cured)
+            self.history['healthy'].append(S)
+            self.history['vaccinated'].append(V)
+            self.history['exposed'].append(E)
+            self.history['infected'].append(I)
+            self.history['cured'].append(R)
 
-            if infected > self.max_infected:
-                self.max_infected = infected
+            if I > self.max_infected:
+                self.max_infected = I
                 self.peak_day = day
 
             log_callback(f"--- День {day + 1} ---")
             log_callback(
-                f"Здоровые: {healthy}, Вакцинированные: {vaccinated_count}, "
-                f"Подверженные: {exposed}, Заражённые: {infected}, Вылеченные: {cured}"
+                f"Здоровые: {S}, Вакцинированные: {V}, "
+                f"Подверженные: {E}, Заражённые: {I}, Вылеченные: {R}"
             )
 
             # раннее завершение, если эпидемия закончилась
-            if (infected == 0 and exposed == 0) or healthy == 0:
+            if I == 0 and E == 0:
                 log_callback("Симуляция завершена.")
                 break
-
-            new_infected = self.population.update()
-            log_callback(f"Новые заражённые: {new_infected}")
 
         return self.history
 

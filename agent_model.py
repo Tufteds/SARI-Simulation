@@ -127,7 +127,7 @@ class Person:
 
             if self.immunity.antibody_level < 0.2:
                 self.state = HealthState.SUSCEPTIBLE
-                self.days_since_recovery = 0
+                self.days_since_recovery = 00
 
         elif self.state == HealthState.VACCINATED:
             self.days_since_vaccination += 1
